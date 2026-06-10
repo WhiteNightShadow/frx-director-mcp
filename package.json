@@ -1,0 +1,31 @@
+{
+  "name": "frx-director-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server that lets a high-capability director model (Claude/GPT) steer the firefox-reverse browser Agent (DeepSeek worker, AI-assist mode). Director corrects direction; DeepSeek grinds the tools. Cost-split reverse-engineering loop.",
+  "type": "module",
+  "bin": {
+    "frx-director-mcp": "dist/index.js"
+  },
+  "exports": "./dist/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
