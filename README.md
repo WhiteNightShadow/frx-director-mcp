@@ -138,8 +138,11 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 |---|---|
 | `FRX_MARIONETTE_PORT` | Marionette 端口，默认 `2828` |
 | `FRX_JSX_PROMPT_SRC` | 指向 firefox-reverse 的 `AgentPanel.jsx`，使 director 系统提示与浏览器 UI 同步 |
-| `FRX_WORKSPACE_ROOT` | 会话工作目录根 |
+| `FRX_WORKSPACE_ROOT` | 会话工作目录根，**默认 `~/.frx-director-mcp/workspaces`**（每个会话一个子目录）|
+| `FRX_DATA_DIR` | 会话状态（convo / turnlog），**默认 `~/.frx-director-mcp/data`** |
 | `FRX_AUTOLAUNCH` + `FRX_FIREFOX_BIN` / `FRX_PROFILE` | 由本服务自动拉起带 Marionette 的浏览器 |
+
+> 📂 **逆向产物在哪里？** 默认每个会话的工作目录是 `~/.frx-director-mcp/workspaces/<会话id>/`（抓取的脚本、还原代码、`ledger.md` / `progress.md` 都落在这里），与你从哪个目录启动无关；`agent_start` / `agent_read` 的返回也会带上该会话的**具体路径**。要改位置，设 `FRX_WORKSPACE_ROOT` 即可。
 
 ## 一键使用
 

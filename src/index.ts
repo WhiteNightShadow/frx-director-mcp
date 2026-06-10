@@ -55,7 +55,8 @@ async function main(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  logErr("ready — 8 tools registered, listening on stdio");
+  logErr("工作目录根:", config.workspaceRoot, "| 会话数据:", config.dataDir);
+  logErr("ready — 9 tools registered, listening on stdio");
 
   const shutdown = async () => {
     try {
