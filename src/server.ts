@@ -18,6 +18,24 @@ const err = (e: unknown) => ({
  */
 export function registerTools(server: McpServer, director: Director): void {
   server.registerTool(
+    "frx_status",
+    {
+      title: "Preflight: check setup before starting",
+      description:
+        "★开跑前先调这个自检:浏览器(marionette)连没连、当前 worker provider/model、worker key 配没配。" +
+        "没就绪就照返回的 note 一句话引导用户(启动浏览器加 marionette / 在浏览器设置里配便宜 worker 模型的 Key),就绪了再 agent_start。只读、无副作用。",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return ok(await director.status());
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "agent_start",
     {
       title: "Start a worker session",

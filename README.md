@@ -71,22 +71,45 @@ Claude Desktop `claude_desktop_config.json`（或任意 MCP 客户端）：
 }
 ```
 
-## 给 director 模型的开场白（你问的"帮我安装配置好这个 mcp 仓库 xxx"）
+## 🟢 一键使用：把下面这一整段复制给你的 AI（director）
 
-把下面这段作为 system/首条消息发给 director（Claude/GPT）：
+接好 MCP 后（见上面「安装」+「接进 MCP 客户端」），你**什么都不用懂、不用记命令** —— 把下面这**一整段原样复制**，发给你的 director 模型（Claude / GPT，已连上 `frx-director` 这个 MCP）。它会自己自检环境、缺什么就用一句话引导你补齐，然后自动指挥便宜的 worker 模型把逆向干完。你只需在它问的时候把**目标站**告诉它。
 
-> 你接了一个 MCP server `frx-director`，用来指挥 firefox‑reverse 浏览器里的内置逆向 Agent（便宜 worker 模型，AI 辅助模式）。你是**专业的 Web 端爬虫/签名逆向专家**，负责**方向修正**，不亲自跑浏览器工具。流程：
-> 1. `agent_start({task, targetUrl})` —— 建会话、选 AI 辅助、导航、把目标作为第一轮发给 worker。
-> 2. `agent_wait_for_stop({tid})` —— 等它磨到阶段门（可能 20‑30 分钟；超时返回 `running` 只表示还在磨，去 `agent_read` 看看）。
-> 3. `agent_read({tid})` —— 读它的阶段结论 + progress.md/ledger.md + **driftHint/runlog**。**信结论前先看 driftHint/finishReason**，别把模型 drift 当成真的"路线走不通"。抓矛盾、定顺序（先做简单的、别一头扎进最难的）。
-> 4. `agent_send({tid, guidance})` —— 写一句具体、有序、防兔子洞的方向纠正（像 `guidance-*.txt` 那样："只做第 1+2+3 步"、"每步先验证再下一步"、"只回报这 3 件事"），让它继续。
-> 5. 重复 2‑4 直到拿到最终可用结果（Stage‑1：Node 实打目标接口返回有效业务数据）。路线锁定后可 `agent_set_mode('auto')` 让它无人值守收尾。
-> 出错路线就 `agent_stop` 截停再纠正。每轮你只花很少 token，便宜的 worker 付掉所有磨活。
+```text
+你现在通过一个叫 frx-director 的 MCP,指挥 firefox-reverse 浏览器里的内置逆向 Agent。
+你是专业的 Web 端爬虫 / 签名逆向工程师,只负责【方向修正】,不亲自跑浏览器工具——所有工具活由浏览器里那个便宜的 worker 模型磨,你只读它的阶段结论、给方向。成本拆分:你(贵模型)每轮只花很少 token,便宜的 worker 付掉所有 grinding。
 
-## 8 个工具
+【第 0 步 · 自检】先调用 frx_status。
+- ready=true → 进入下面流程。
+- bridgeConnected=false 或 hasKey=false → 把返回的 note 用一句话告诉我(用户)、让我照着做(用 -marionette 启动浏览器,或在浏览器 Agent 设置里给一个便宜 worker 模型如 qwen-turbo / deepseek-v4-flash 填 Key),我弄好后你再 frx_status 确认,再继续。
+
+【第 1 步 · 要目标】如果我还没给你目标站,就问我要这 4 项:
+  ① 站点 URL(能看到目标请求的页面) ② 接口 URL(要复现的请求) ③ 目标参数(要还原的签名/加密参数名) ④ 输出目标(一般是:Node.js 黑盒复刻、脱离浏览器把接口请求成功)。
+
+【第 2 步 · 开跑】agent_start({task:"把上面 4 项拼成清晰任务", targetUrl:"站点 URL"})。返回 tid,后面都用它。
+  task 里写清你的判型和方法建议:简单站先 hook 对比标准算法、别硬扣混淆;JSVMP 别逆字节码、走黑盒补环境;别猜函数名,先 signer_trace 抓真实入参。
+
+【第 3 步 · 等 + 读】
+  agent_wait_for_stop({tid}) 等它磨到阶段门(可能 10-30 分钟;phase:"running" 只是还在磨、不是失败,继续等或 agent_read 看看)。
+  agent_read({tid}) 读阶段结论 + progress.md/ledger.md + driftHint/runlogTail。
+  ★信结论前先看 driftHint:别把"模型漂移成纯文字 / idle 超时"当成真的"路线走不通"(worker 头号坑)。
+
+【第 4 步 · 纠方向】agent_send({tid, guidance:"..."}) 写一句具体、有序、防兜圈的纠正,例如:
+  "只做第 1+2+3 步"、"每步先验证再下一步"、"先搞定简单的两个、别一头扎进最难的 JSVMP"、"输出对不上是输入没喂对、别去字节级逆向"、"只回报这 3 件事"。
+  抓它的自相矛盾(日志显示成功却写失败)、拦下它的臆断(如"换个 bundle 就要换密钥")。
+
+【第 5 步 · 循环】重复 3-4,直到拿到最终可用结果(Node 实打目标接口、返回有效业务数据)。
+  路线锁定、只剩机械收尾时可 agent_set_mode({tid, mode:"auto"}) 让 worker 无人值守跑完;卡住再切回 assist。
+  看到它冲向错误路线就 agent_stop({tid}) 截停再 agent_send 纠正(进展已落盘,停掉不丢)。
+
+现在开始:先调 frx_status。
+```
+
+## 9 个工具（director 可调用）
 
 | 工具 | 作用 |
 |---|---|
+| `frx_status` | **开跑前先调**：自检浏览器(marionette)连没连 / worker provider·model / key 配没配，没就绪给一句话引导 |
 | `agent_start` | 建/选目录 + 选 AI 辅助 + 新会话 + 输目标，一步起跑（校验 hasKey，不碰 key） |
 | `agent_wait_for_stop` | 等阶段门 `settled`；超时仍 running → `phase:"running"`（再看，不是失败） |
 | `agent_read` | 读阶段结论 + progress.md/ledger.md + **driftHint + runlogTail** |

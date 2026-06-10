@@ -76,6 +76,35 @@ export class Director {
     return false;
   }
 
+  /** Preflight self-check: bridge reachable? active provider/model? worker key configured?
+   *  The director should call this FIRST and guide the user per `note` if not ready. */
+  async status() {
+    try {
+      const cfg = await this.bridge.config({ model: null, ensureConfirmOff: false });
+      return {
+        bridgeConnected: true,
+        ready: !!cfg.hasKey,
+        provider: cfg.provider,
+        model: cfg.model,
+        hasKey: cfg.hasKey,
+        confirmTools: cfg.confirmTools,
+        note: cfg.hasKey
+          ? `就绪:浏览器已连、worker provider=${cfg.provider}、model=${cfg.model}。可以直接 agent_start。`
+          : `浏览器连上了,但 provider "${cfg.provider}" 没配 API Key —— 请用户在 Firefox Reverse 的 Agent ⚙️ 设置里,给一个便宜 worker 模型(如 qwen-turbo / deepseek-v4-flash / glm)填好 Key。`,
+      };
+    } catch (e) {
+      return {
+        bridgeConnected: false,
+        ready: false,
+        error: String((e as Error)?.message ?? e),
+        note:
+          "连不上浏览器的 marionette(127.0.0.1:2828)。请用户用 " +
+          '`"/Applications/Firefox Reverse.app/Contents/MacOS/firefox" -marionette -remote-allow-system-access -profile "<你的 profile>"` ' +
+          "启动 Firefox Reverse(或设 FRX_AUTOLAUNCH=1+FRX_FIREFOX_BIN/FRX_PROFILE 让本 MCP 替你拉起)。",
+      };
+    }
+  }
+
   async start(args: {
     task: string;
     targetUrl?: string;
