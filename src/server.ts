@@ -41,12 +41,12 @@ export function registerTools(server: McpServer, director: Director): void {
       title: "Start a worker session",
       description:
         "开一个新的逆向会话:配置 worker 模型(默认沿用浏览器里已配的)+关掉工具确认门、(可选)导航到目标 URL、建工作目录、用便宜的 worker 模型以【AI 辅助模式】发出第一轮(task 作为第 0 条 user)。返回 tid,后续都用它。" +
-        "绝不读/写 worker 的 key——key 由用户预先在浏览器里配好;这里只校验 hasKey=true。worker 选标准/快档别选推理档(推理档在长工具循环里易漂移成纯文字),如 deepseek-v4-flash / qwen-turbo / glm。",
+        "绝不读/写 worker 的 key——key 由用户预先在浏览器里配好;这里只校验 hasKey=true。worker 默认推荐 deepseek-v4-pro(推理强、更适合难站);pro 在长工具循环里偶尔漂移成纯文字,但 driftHint/runlog 会标出来、director 用 agent_send 给一条'先调工具'的具体指令即可拉回。",
       inputSchema: {
         task: z.string().describe("逆向目标(成为 convo[0] 的 user 内容),例如:还原 xxx.com 的 X-S 签名并 Node 实打接口"),
         targetUrl: z.string().optional().describe("开跑前把当前 tab 导航到这个 URL"),
         provider: z.string().optional().describe("切到这个 provider 再跑(如 deepseek/zhipu/custom),省略=沿用浏览器当前 active。不碰 key,只校验该 provider 的 hasKey"),
-        model: z.string().optional().describe("worker 模型名(省略=沿用浏览器配置)。flash 档,如 deepseek-v4-flash(中转)/deepseek-chat(直连)"),
+        model: z.string().optional().describe("worker 模型名(省略=沿用浏览器配置)。推荐 deepseek-v4-pro(中转)/deepseek-reasoner(直连推理档)"),
         workspaceRoot: z.string().optional().describe("工作目录绝对路径(省略=在 FRX_WORKSPACE_ROOT 下自动建一个)"),
         maxRounds: z.number().optional().describe("单轮最大工具回合,默认 80"),
         assist: z.boolean().optional().describe("默认 true=阶段门停。false=全自动"),
