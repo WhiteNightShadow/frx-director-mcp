@@ -133,3 +133,35 @@ const { agentSession } = ChromeUtils.importESModule(${JSON.stringify(MOD("AgentS
 agentSession.stop(tid);
 return { ok:true, stopped:true, wasRunning: agentSession.isRunning(tid) };
 `;
+
+/**
+ * Enumerate the worker's browser-side tool catalog (name / description / confirm /
+ * param names) for director VISIBILITY only — handlers are never invoked here.
+ * Passes proxy stub backends so every tool passes its _need(backends) gate (so we
+ * get the FULL declared surface, not just whatever backends happen to be wired),
+ * and falls back to declaredToolNames() for the authoritative name list. Defensive
+ * against older browser builds that may lack a given export.
+ */
+export const JS_TOOLS = `
+const mod = ChromeUtils.importESModule(${JSON.stringify(MOD("Tools"))});
+const stub = function(){ return new Proxy({}, { get: function(){ return function(){}; } }); };
+const backends = { page:stub(), code:stub(), net:stub(), scripts:stub(), jsvmp:stub(), workspace:stub() };
+let tools = [];
+try {
+  tools = (mod.createBuiltinTools(backends) || []).map(function(t){
+    let params = [];
+    try { if (t.parameters && t.parameters.properties) params = Object.keys(t.parameters.properties); } catch (e) {}
+    return { name: t.name,
+             description: String((t && t.description) || "").slice(0, 300),
+             needsConfirm: !!t.needsConfirm,
+             params: params };
+  });
+} catch (e) {}
+let declaredNames = [];
+try {
+  declaredNames = (typeof mod.declaredToolNames === "function")
+    ? mod.declaredToolNames()
+    : tools.map(function(t){ return t.name; });
+} catch (e) {}
+return { tools: tools, declaredNames: declaredNames, count: tools.length };
+`;

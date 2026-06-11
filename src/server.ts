@@ -11,7 +11,7 @@ const err = (e: unknown) => ({
 });
 
 /**
- * Register the 8 director tools. The cost-split is STRUCTURAL: there is no tool
+ * Register the director tools. The cost-split is STRUCTURAL: there is no tool
  * that lets the director run a browser tool itself — the only way to make
  * progress is to delegate to the worker model (agent_start/agent_send) and
  * review its stage conclusions (agent_read). assist mode is the load-bearing gate.
@@ -196,6 +196,24 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => {
       try {
         return ok(await director.runlog(a));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "agent_tools",
+    {
+      title: "List the worker's browser-side tools",
+      description:
+        "列出浏览器侧 worker 当前可用的逆向工具清单(名称/说明/是否需确认/参数名)——让 director 知道 worker 有哪些能力,好把 guidance 写到点上(指名让它用 signer_trace / jsvmp_trace / page_eval 等)。" +
+        "★director 不直接调这些工具(成本拆分:推进只能靠 agent_start / agent_send 委派 worker);本工具只读、无副作用,偶尔参考一次即可。",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return ok(await director.tools());
       } catch (e) {
         return err(e);
       }

@@ -13,12 +13,14 @@ import {
   JS_NEWTHREAD,
   JS_APPEND,
   JS_SETWORKSPACE,
+  JS_TOOLS,
 } from "./chromeScripts.js";
 import type {
   BrowserBridge,
   StateSnap,
   RunParams,
   ConfigResult,
+  ToolCatalog,
 } from "./BrowserBridge.js";
 
 /** How long connect() waits for the cross-process Marionette lock before giving
@@ -200,5 +202,12 @@ export class MarionetteBridge implements BrowserBridge {
   async runlog(): Promise<unknown[]> {
     const r = await this.exec((w) => w.execute(JS_RUNLOG, []));
     return Array.isArray(r) ? r : [];
+  }
+
+  async listTools(): Promise<ToolCatalog> {
+    const r = (await this.exec((w) => w.execute(JS_TOOLS, []))) as Partial<ToolCatalog> | null;
+    const tools = Array.isArray(r?.tools) ? r!.tools : [];
+    const declaredNames = Array.isArray(r?.declaredNames) ? r!.declaredNames : [];
+    return { tools, declaredNames, count: typeof r?.count === "number" ? r!.count : tools.length };
   }
 }
