@@ -90,7 +90,7 @@ export class Director {
         confirmTools: cfg.confirmTools,
         note: cfg.hasKey
           ? `就绪:浏览器已连、worker provider=${cfg.provider}、model=${cfg.model}。可以直接 agent_start。`
-          : `浏览器连上了,但 provider "${cfg.provider}" 没配 API Key —— 请用户在 Firefox Reverse 的 Agent ⚙️ 设置里,给 worker 模型(推荐 deepseek-v4-pro,推理强;或 qwen / glm 等)填好 Key。`,
+          : `浏览器连上了,但 provider "${cfg.provider}" 没配 API Key —— 请用户在 Firefox Reverse 的 Agent ⚙️ 设置里,给一个便宜 worker 模型(如 qwen-turbo / deepseek-v4-flash / glm)填好 Key。`,
       };
     } catch (e) {
       return {
