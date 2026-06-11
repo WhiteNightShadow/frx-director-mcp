@@ -42,11 +42,25 @@ export class MarionetteWire {
     await this.command("Marionette:SetContext", { value: "chrome" });
   }
 
+  /** Usable for commands? False once fail()/close() has fired. The bridge checks
+   *  this to decide whether to discard a dead wire and reconnect with a fresh one. */
+  isConnected(): boolean {
+    return !this.closed && this.sock !== null;
+  }
+
   private fail(e: Error): void {
     if (this.closed) return;
     this.closed = true;
     const w = this.waiters.splice(0);
     for (const { reject } of w) reject(e);
+    // Tear down the dead socket so it doesn't leak when the bridge discards this
+    // wire and builds a fresh one to reconnect.
+    try {
+      this.sock?.destroy();
+    } catch {
+      /* ignore */
+    }
+    this.sock = null;
   }
 
   private onData(d: Buffer): void {

@@ -25,6 +25,23 @@ export interface ConfigResult {
   confirmTools: boolean;
 }
 
+/** One browser-side reverse-engineering tool the worker can use. */
+export interface ToolInfo {
+  name: string;
+  description: string;
+  needsConfirm: boolean;
+  params: string[];
+}
+
+/** The worker's tool catalog (read-only — surfaced so the director knows the
+ *  worker's capabilities; the director never calls these directly). */
+export interface ToolCatalog {
+  tools: ToolInfo[];
+  /** All declared tool names regardless of which backends are wired (fallback list). */
+  declaredNames: string[];
+  count: number;
+}
+
 /**
  * Transport seam between the MCP server and the browser's parent-process
  * agentSession singleton. MarionetteBridge is the proven default; FileBridge is
@@ -53,4 +70,6 @@ export interface BrowserBridge {
   getContent(tid: string): Promise<{ content: string; running: boolean; settled: boolean }>;
   stop(tid: string): Promise<{ ok: boolean; stopped: boolean; wasRunning: boolean }>;
   runlog(): Promise<unknown[]>;
+  /** Read-only catalog of the browser-side tools the worker can use. */
+  listTools(): Promise<ToolCatalog>;
 }

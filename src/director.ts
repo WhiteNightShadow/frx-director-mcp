@@ -37,20 +37,31 @@ function readFileSafe(p: string, maxChars: number): string | undefined {
  * text/think with zero tool calls, and ALWAYS surface the raw runlog tail so the
  * director can cross-check finishReason before trusting a "route-dead" call.
  */
-function driftHint(steps: StateSnap["steps"]): { likelyDrift: boolean; reason: string } {
+function driftHint(steps: StateSnap["steps"]): {
+  likelyDrift: boolean;
+  recentToolCalls: number;
+  totalToolCalls: number;
+  reason: string;
+} {
   const tail = steps.slice(-6);
-  if (!tail.length) return { likelyDrift: false, reason: "" };
-  const toolsInTail = tail.filter((s) => s.k === "tool").length;
-  const lastKind = tail[tail.length - 1]!.k;
-  if (toolsInTail === 0 && (lastKind === "text" || lastKind === "think")) {
-    return {
-      likelyDrift: true,
-      reason:
-        "末尾若干步全是纯文字/思考、零工具调用 — 可能是模型漂移成纯文字计划（assist 模式下会被强制收成 final）。" +
-        "信这个结论前先看 agent_runlog 的 finishReason，别把 drift/idle-timeout 当成真的“路线走不通”。",
-    };
+  const recentToolCalls = tail.filter((s) => s.k === "tool").length;
+  const totalToolCalls = steps.filter((s) => s.k === "tool").length;
+  const lastKind = tail.length ? tail[tail.length - 1]!.k : "";
+  // Drift suspicion: the recent tail is all text/think with zero tool calls. But
+  // surface the objective counts too — a turn that already did lots of tool work
+  // and is now summarizing looks identical via the tail alone, so totalToolCalls
+  // lets the director tell a legit stage report from a real early drift.
+  const likelyDrift = tail.length > 0 && recentToolCalls === 0 && (lastKind === "text" || lastKind === "think");
+  let reason = "";
+  if (likelyDrift) {
+    reason =
+      `末尾 ${tail.length} 步零工具调用、以纯文字/思考收尾（本轮累计 ${totalToolCalls} 次工具调用）。` +
+      (totalToolCalls > 0
+        ? "本轮此前已有大量工具进展 → 更像正常的阶段汇报、而非漂移；"
+        : "本轮几乎没调过工具 → 更像模型漂移成纯文字计划（assist 下会被强制收成 final）；") +
+      "下结论前看 agent_runlog 的 finishReason 交叉确认，别把 drift/idle-timeout 当成真的“路线走不通”。";
   }
-  return { likelyDrift: false, reason: "" };
+  return { likelyDrift, recentToolCalls, totalToolCalls, reason };
 }
 
 export class Director {
@@ -305,5 +316,20 @@ export class Director {
       ? all.filter((e) => e && typeof e === "object" && (e as { threadId?: string }).threadId === args.tid)
       : all;
     return { entries: entries.slice(-20), raw: !args.tid };
+  }
+
+  /** Read-only: the browser-side tool catalog the worker can use. Surfaced so the
+   *  director can write more precise guidance — NOT so it can call tools itself
+   *  (the cost-split keeps execution on the worker via agent_start/agent_send). */
+  async tools() {
+    const cat = await this.bridge.listTools();
+    return {
+      count: cat.count,
+      tools: cat.tools,
+      declaredNames: cat.declaredNames,
+      note:
+        "浏览器侧 worker 当前可用的逆向工具清单。director 不直接调用它们 —— 成本拆分要求推进只能靠 agent_start / agent_send 委派 worker;" +
+        "此清单仅供你了解 worker 有哪些能力,好把 guidance 写到点上(例如指名让它用 signer_trace / jsvmp_trace / page_eval 等)。",
+    };
   }
 }

@@ -40,14 +40,10 @@ async function main(): Promise<void> {
   }
 
   const bridge = makeBridge();
-  try {
-    await bridge.connect();
-    logErr("bridge connected:", config.bridge);
-  } catch (e) {
-    logErr("bridge connect failed:", (e as Error).message);
-    // Still start the MCP server so tool calls return a clear error rather than the
-    // whole server failing to launch under the client.
-  }
+  // Connection is LAZY: we deliberately do NOT connect here. Opening Marionette
+  // eagerly would make every idle session grab the single-client lock just by
+  // being open. The bridge connects (and acquires the cross-process lock) on the
+  // first tool that needs the browser; frx_status reports connectivity on demand.
 
   const director = new Director(bridge, config);
   const server = new McpServer({ name: "frx-director-mcp", version: "0.1.0" });
@@ -56,7 +52,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   logErr("工作目录根:", config.workspaceRoot, "| 会话数据:", config.dataDir);
-  logErr("ready — 9 tools registered, listening on stdio");
+  logErr("ready — 10 tools registered, listening on stdio");
 
   const shutdown = async () => {
     try {

@@ -5,6 +5,7 @@ import type {
   StateSnap,
   RunParams,
   ConfigResult,
+  ToolCatalog,
 } from "./BrowserBridge.js";
 
 /**
@@ -86,5 +87,8 @@ export class FileBridge implements BrowserBridge {
   async runlog(): Promise<unknown[]> {
     const r = await this.send("runlog", {});
     return Array.isArray(r) ? r : [];
+  }
+  async listTools(): Promise<ToolCatalog> {
+    return (await this.send("list-tools", {})) as ToolCatalog;
   }
 }
