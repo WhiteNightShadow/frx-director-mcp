@@ -328,8 +328,24 @@ export class Director {
       tools: cat.tools,
       declaredNames: cat.declaredNames,
       note:
-        "浏览器侧 worker 当前可用的逆向工具清单。director 不直接调用它们 —— 成本拆分要求推进只能靠 agent_start / agent_send 委派 worker;" +
-        "此清单仅供你了解 worker 有哪些能力,好把 guidance 写到点上(例如指名让它用 signer_trace / jsvmp_trace / page_eval 等)。",
+        "浏览器侧可用的逆向工具清单。默认走成本拆分(委派 worker:agent_start / agent_send);" +
+        "0.2.0 起也可用 agent_call_tool 亲自直调其中任一工具(更快更准但花 director token)。" +
+        "先看此清单的 name 和 params,再决定委派还是直调。",
     };
+  }
+
+  /**
+   * Direct tool dispatch — the director runs ONE engine tool itself, bypassing the
+   * worker. OPT-IN: breaks the default cost-split on purpose (a strong director
+   * driving engine tools directly is faster/more accurate but costs director tokens
+   * per round). The browser refuses while any session runs (shared page/hook state);
+   * the envelope is returned as-is (browser-side dispatch never throws).
+   */
+  async callTool(args: { name: string; args?: Record<string, unknown>; workspaceRoot?: string | null }) {
+    const env = await this.bridge.callTool(args.name, args.args || {}, {
+      workspaceRoot: args.workspaceRoot ?? null,
+    });
+    this.log.event("raw", "call-tool", { name: args.name, ok: env.ok, error: env.error });
+    return env;
   }
 }

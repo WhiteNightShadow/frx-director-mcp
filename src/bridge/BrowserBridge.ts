@@ -33,13 +33,23 @@ export interface ToolInfo {
   params: string[];
 }
 
-/** The worker's tool catalog (read-only — surfaced so the director knows the
- *  worker's capabilities; the director never calls these directly). */
+/** The worker's tool catalog (surfaced so the director knows the capabilities;
+ *  with agent_call_tool 0.2.0+ the director may also dispatch these directly). */
 export interface ToolCatalog {
   tools: ToolInfo[];
   /** All declared tool names regardless of which backends are wired (fallback list). */
   declaredNames: string[];
   count: number;
+}
+
+/** Envelope returned by a direct tool dispatch (browser-side ToolRouter.dispatch —
+ *  never throws; `running` is set when callTool is refused because a session is live). */
+export interface ToolEnvelope {
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+  meta?: Record<string, unknown>;
+  running?: Array<{ id: string; nSteps: number; checkpointSeq: number }>;
 }
 
 /**
@@ -72,4 +82,6 @@ export interface BrowserBridge {
   runlog(): Promise<unknown[]>;
   /** Read-only catalog of the browser-side tools the worker can use. */
   listTools(): Promise<ToolCatalog>;
+  /** Directly dispatch ONE browser tool, bypassing the worker. Refused while a session runs. */
+  callTool(name: string, args: Record<string, unknown>, opts?: { workspaceRoot?: string | null }): Promise<ToolEnvelope>;
 }

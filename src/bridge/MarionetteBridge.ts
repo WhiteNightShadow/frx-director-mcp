@@ -14,6 +14,7 @@ import {
   JS_APPEND,
   JS_SETWORKSPACE,
   JS_TOOLS,
+  JS_CALLTOOL,
 } from "./chromeScripts.js";
 import type {
   BrowserBridge,
@@ -21,6 +22,7 @@ import type {
   RunParams,
   ConfigResult,
   ToolCatalog,
+  ToolEnvelope,
 } from "./BrowserBridge.js";
 
 /** How long connect() waits for the cross-process Marionette lock before giving
@@ -209,5 +211,18 @@ export class MarionetteBridge implements BrowserBridge {
     const tools = Array.isArray(r?.tools) ? r!.tools : [];
     const declaredNames = Array.isArray(r?.declaredNames) ? r!.declaredNames : [];
     return { tools, declaredNames, count: typeof r?.count === "number" ? r!.count : tools.length };
+  }
+
+  async callTool(
+    name: string,
+    args: Record<string, unknown>,
+    opts: { workspaceRoot?: string | null } = {},
+  ): Promise<ToolEnvelope> {
+    // Async chrome JS (callTool returns a Promise). A trace on a hot path / run_node
+    // can run long → generous scriptTimeout; the exec() funnel keeps the lock and
+    // reconnects once on a mid-op socket drop.
+    return (await this.exec((w) =>
+      w.executeAsync(JS_CALLTOOL, [name, args || {}, opts.workspaceRoot ?? null], 300_000),
+    )) as ToolEnvelope;
   }
 }

@@ -11,10 +11,14 @@ const err = (e: unknown) => ({
 });
 
 /**
- * Register the director tools. The cost-split is STRUCTURAL: there is no tool
- * that lets the director run a browser tool itself — the only way to make
- * progress is to delegate to the worker model (agent_start/agent_send) and
- * review its stage conclusions (agent_read). assist mode is the load-bearing gate.
+ * Register the director tools. Two modes:
+ *  1. Delegate (default cost-split): drive the cheap worker via agent_start/
+ *     agent_send and review stage conclusions (agent_read); assist mode is the
+ *     load-bearing gate. agent_tools surfaces the catalog so guidance is precise.
+ *  2. Direct drive (0.2.0, opt-in): agent_call_tool runs ONE browser tool itself,
+ *     bypassing the worker — faster/more accurate for a strong director, but costs
+ *     director tokens per round. Refused while a worker session runs (shared page/
+ *     hook state). Existing delegate flows are unchanged whether or not it's used.
  */
 export function registerTools(server: McpServer, director: Director): void {
   server.registerTool(
@@ -205,15 +209,39 @@ export function registerTools(server: McpServer, director: Director): void {
   server.registerTool(
     "agent_tools",
     {
-      title: "List the worker's browser-side tools",
+      title: "List the browser-side tools",
       description:
-        "列出浏览器侧 worker 当前可用的逆向工具清单(名称/说明/是否需确认/参数名)——让 director 知道 worker 有哪些能力,好把 guidance 写到点上(指名让它用 signer_trace / jsvmp_trace / page_eval 等)。" +
-        "★director 不直接调这些工具(成本拆分:推进只能靠 agent_start / agent_send 委派 worker);本工具只读、无副作用,偶尔参考一次即可。",
+        "列出浏览器侧可用的逆向工具清单(名称/说明/是否需确认/参数名)——含 16 个引擎级逆向工具(signer_trace/jsvmp_trace/closure_read/webapi_trace/whitebox_diff/wasm_probe 等,页面检测不到)。" +
+        "默认走成本拆分(把工具名写进 guidance、委派 worker 执行);0.2.0 起也可用 agent_call_tool 亲自直调。只读、无副作用,先看这个再决定委派还是直调。",
       inputSchema: {},
     },
     async () => {
       try {
         return ok(await director.tools());
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "agent_call_tool",
+    {
+      title: "Directly run ONE browser tool (bypass the worker)",
+      description:
+        "★你(director)亲自跑一个浏览器引擎工具,跳过 DeepSeek worker —— 强模型直驱引擎级工具,比委派 worker 磨更快更准。" +
+        "代价:每个工具回合都花 director 的 token(打破默认成本拆分;按需用、不用就仍走 agent_start/agent_send 省钱流)。先 agent_tools 查 name 和参数。" +
+        "返回工具信封(ok/data/error);浏览器侧 dispatch 永不抛、已校验未知工具与缺参。" +
+        "⚠ 任一会话(agent_start 起的)正在跑时会被拒绝:raw 直调与运行中的 agent 共享同一标签页/hook/trace 状态,并发会串味——先 agent_stop/agent_wait_for_stop 再直调。需浏览器 v0.20.0+。",
+      inputSchema: {
+        name: z.string().describe("工具名(来自 agent_tools),如 code_search / signer_trace / page_eval / jsvmp_trace"),
+        args: z.record(z.unknown()).optional().describe("该工具的参数对象(按 agent_tools 给的 params 填);省略=空对象"),
+        workspaceRoot: z.string().optional().describe("本次调用的工作目录绝对路径(影响 fs_*/run_node/trace 落盘);省略=引擎默认"),
+      },
+    },
+    async (a) => {
+      try {
+        return ok(await director.callTool(a));
       } catch (e) {
         return err(e);
       }

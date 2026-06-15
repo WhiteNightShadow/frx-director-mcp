@@ -165,3 +165,24 @@ try {
 } catch (e) {}
 return { tools: tools, declaredNames: declaredNames, count: tools.length };
 `;
+
+/**
+ * Directly dispatch ONE built-in tool (bypassing the DeepSeek worker) and return
+ * its envelope. Uses the browser's agentSession.callTool (firefox-reverse v0.20.0+),
+ * which dispatches via the SAME live ToolRouter+backends singleton the worker uses,
+ * refuses while any session runs (shared page/hook state), and never throws.
+ * Defensive: older browser builds lack callTool → return a clear upgrade hint.
+ * Async (callTool returns a Promise) → cb as LAST arg.
+ */
+export const JS_CALLTOOL = `
+const a = arguments; const cb = a[a.length - 1];
+const [name, args, ws] = a;
+const { agentSession } = ChromeUtils.importESModule(${JSON.stringify(MOD("AgentSession"))});
+if (typeof agentSession.callTool !== "function") {
+  cb({ ok:false, error:"this Firefox-Reverse build has no agentSession.callTool — update to v0.20.0+ to use agent_call_tool" });
+} else {
+  Promise.resolve(agentSession.callTool(name, args || {}, { workspaceRoot: ws || null }))
+    .then(function(env){ cb(env); })
+    .catch(function(e){ cb({ ok:false, error: String((e && e.message) || e) }); });
+}
+`;

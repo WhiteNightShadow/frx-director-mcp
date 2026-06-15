@@ -6,6 +6,7 @@ import type {
   RunParams,
   ConfigResult,
   ToolCatalog,
+  ToolEnvelope,
 } from "./BrowserBridge.js";
 
 /**
@@ -90,5 +91,8 @@ export class FileBridge implements BrowserBridge {
   }
   async listTools(): Promise<ToolCatalog> {
     return (await this.send("list-tools", {})) as ToolCatalog;
+  }
+  async callTool(name: string, args: Record<string, unknown>, opts: { workspaceRoot?: string | null } = {}) {
+    return (await this.send("call-tool", { name, args, workspaceRoot: opts.workspaceRoot ?? null })) as ToolEnvelope;
   }
 }
