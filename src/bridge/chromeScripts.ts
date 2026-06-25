@@ -145,7 +145,7 @@ return { ok:true, stopped:true, wasRunning: agentSession.isRunning(tid) };
 export const JS_TOOLS = `
 const mod = ChromeUtils.importESModule(${JSON.stringify(MOD("Tools"))});
 const stub = function(){ return new Proxy({}, { get: function(){ return function(){}; } }); };
-const backends = { page:stub(), code:stub(), net:stub(), scripts:stub(), jsvmp:stub(), workspace:stub() };
+const backends = { page:stub(), code:stub(), net:stub(), scripts:stub(), jsvmp:stub(), workspace:stub(), cookies:stub() };
 let tools = [];
 try {
   tools = (mod.createBuiltinTools(backends) || []).map(function(t){
