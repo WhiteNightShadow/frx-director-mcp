@@ -1,8 +1,8 @@
 {
   "name": "frx-director-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "MCP server for the firefox-reverse browser Agent. Default: steer the cheap DeepSeek worker (AI-assist cost-split loop). Opt-in (0.2.0): drive the engine's 44 built-in tools directly via agent_call_tool (strong director, bypasses the worker). Never touches your API key.",
+  "description": "MCP server for the firefox-reverse browser Agent and fingerprint environments. Delegate to the cheap worker, direct-drive engine tools, or select/create/import isolated FRX_ENV_ID environments.",
   "type": "module",
   "bin": {
     "frx-director-mcp": "dist/index.js"

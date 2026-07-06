@@ -39,6 +39,149 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
+  const callEnvTool = async (name: string, args: Record<string, unknown>) => {
+    try {
+      return ok(await director.callTool({ name, args }));
+    } catch (e) {
+      return err(e);
+    }
+  };
+
+  server.registerTool(
+    "frx_env_current",
+    {
+      title: "Get current Firefox Reverse environment",
+      description: "返回当前连接的 Firefox Reverse 进程所属环境；不是环境进程时 environment=null。",
+      inputSchema: {
+        refresh: z.boolean().optional().describe("是否刷新运行状态，默认 true"),
+      },
+    },
+    async (a) => callEnvTool("env_current", a),
+  );
+
+  server.registerTool(
+    "frx_env_list",
+    {
+      title: "List Firefox Reverse environments",
+      description: "列出 firefox-reverse 环境，供 MCP 侧环境管理按钮使用。",
+      inputSchema: {
+        refresh: z.boolean().optional().describe("是否刷新运行状态，默认 true"),
+      },
+    },
+    async (a) => callEnvTool("env_list", a),
+  );
+
+  server.registerTool(
+    "frx_env_create",
+    {
+      title: "Create a Firefox Reverse environment",
+      description: "一键新建环境；默认随机生成一组 Chrome-like 桌面指纹参数。",
+      inputSchema: {
+        name: z.string().optional().describe("环境名称"),
+        randomize: z.boolean().optional().describe("默认 true，随机生成一致的桌面参数"),
+        browser: z.string().optional().describe("默认 chromium；也可传 firefox"),
+      },
+    },
+    async (a) =>
+      callEnvTool("env_create", {
+        name: a.name,
+        generateOptions: { randomize: a.randomize !== false, browser: a.browser || "chromium" },
+      }),
+  );
+
+  server.registerTool(
+    "frx_env_rename",
+    {
+      title: "Rename a Firefox Reverse environment",
+      description: "重命名已有环境。",
+      inputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
+    },
+    async (a) => callEnvTool("env_update", a),
+  );
+
+  server.registerTool(
+    "frx_env_open",
+    {
+      title: "Open a Firefox Reverse environment",
+      description: "打开指定环境：独立 profile + 独立 Firefox 进程。",
+      inputSchema: {
+        id: z.string(),
+      },
+    },
+    async (a) => callEnvTool("env_open", a),
+  );
+
+  server.registerTool(
+    "frx_env_close",
+    {
+      title: "Close a Firefox Reverse environment",
+      description: "关闭指定环境进程。",
+      inputSchema: {
+        id: z.string(),
+      },
+    },
+    async (a) => callEnvTool("env_close", a),
+  );
+
+  server.registerTool(
+    "frx_env_delete",
+    {
+      title: "Delete a Firefox Reverse environment",
+      description: "删除已关闭环境。必须显式传 confirm:true。",
+      inputSchema: {
+        id: z.string(),
+        confirm: z.boolean(),
+      },
+    },
+    async (a) => callEnvTool("env_delete", a),
+  );
+
+  server.registerTool(
+    "frx_env_import_json",
+    {
+      title: "Import a full Firefox Reverse environment JSON",
+      description:
+        "导入完整环境 JSON。支持 {name,id,fingerprint,proxy,generateOptions} 或 {env,fingerprint,proxy}；id 已存在时需 overwrite:true。",
+      inputSchema: {
+        id: z.string().optional().describe("可选；指定导入到哪个环境 id"),
+        name: z.string().optional().describe("可选；覆盖导入后的环境名称"),
+        text: z.string().optional().describe("完整环境 JSON 文本"),
+        config: z.record(z.unknown()).optional().describe("完整环境 JSON object"),
+        overwrite: z.boolean().optional().describe("id 已存在时是否覆盖 fingerprint/proxy/name"),
+      },
+    },
+    async (a) => callEnvTool("env_import", a),
+  );
+
+  server.registerTool(
+    "frx_env_import_capture",
+    {
+      title: "Import pasted fingerprint capture JSON",
+      description: "把外部浏览器控制台采集到的 JSON 文本导入指定环境。",
+      inputSchema: {
+        id: z.string(),
+        text: z.string().describe("采集脚本弹出的 JSON 文本"),
+      },
+    },
+    async (a) => callEnvTool("env_import_fingerprint", a),
+  );
+
+  server.registerTool(
+    "frx_page_automation_scan",
+    {
+      title: "Scan browser automation exposure in the current page",
+      description:
+        "在当前网页内容上下文扫描常见自动化/底层环境暴露点：navigator.webdriver、UA-CH、plugins、permissions、WebGL/canvas/audio/WebRTC/storage 等。用于比较手动打开与 MCP 打开的全局差异，不做单站点加密分析。",
+      inputSchema: {
+        saveTo: z.string().optional().describe("可选；保存完整扫描 JSON 的工作目录相对路径，如 diagnostics/automation-scan.json"),
+      },
+    },
+    async (a) => callEnvTool("page_automation_scan", a),
+  );
+
   server.registerTool(
     "agent_start",
     {

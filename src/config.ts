@@ -57,6 +57,8 @@ export const config = {
   autolaunch: env.FRX_AUTOLAUNCH === "1",
   firefoxBin: env.FRX_FIREFOX_BIN || "",
   profile: env.FRX_PROFILE || "",
+  envId: env.FRX_ENV_ID || "",
+  envsRoot: env.FRX_ENVS_ROOT || join(homedir(), ".firefox-reverse", "environments"),
 
   jsxPromptSrc: env.FRX_JSX_PROMPT_SRC || "",
   defaultModel: env.FRX_DEFAULT_MODEL || "",

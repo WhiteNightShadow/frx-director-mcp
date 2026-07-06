@@ -12,14 +12,14 @@
 
 </div>
 
-> **EN — TL;DR:** An MCP server bridging a high-capability model (Claude / GPT) to the [firefox-reverse](https://github.com/WhiteNightShadow/firefox-reverse) browser's built-in reverse-engineering engine. **Two composable modes:** (1) **Delegate** — the strong model *directs* while a cheap worker (DeepSeek / Qwen / GLM) *executes* all tooling (token cost-split); (2) **Direct-drive** — the strong model uses its *own* skill / experience library and calls the 44 engine tools itself via `agent_call_tool`. Never touches your API key (configured once in the browser).
+> **EN — TL;DR:** An MCP server bridging a high-capability model (Claude / GPT) to the [firefox-reverse](https://github.com/WhiteNightShadow/firefox-reverse) browser's built-in reverse-engineering engine. **Two composable modes:** (1) **Delegate** — the strong model *directs* while a cheap worker (DeepSeek / Qwen / GLM) *executes* all tooling (token cost-split); (2) **Direct-drive** — the strong model uses its *own* skill / experience library and calls the 44 engine tools itself via `agent_call_tool`. It can also list/create/open/import isolated fingerprint environments via `FRX_ENV_ID`. Never touches your API key (configured once in the browser).
 
 `frx-director-mcp` 是一个 MCP 服务，把**强模型**（Claude / GPT）通过标准 MCP 协议接到 [firefox-reverse](https://github.com/WhiteNightShadow/firefox-reverse) 浏览器内置的逆向引擎上。**两种可自由组合的模式：**
 
 - **模式一 · 领航委派（高模型配置、低模型调用）**：强模型当 director 只**下方向、审结论**；**便宜的 worker 模型**（DeepSeek-flash / Qwen-turbo / GLM）在浏览器里**执行全部工具**（抓包、签名追踪、补环境、脚本验证…）。token 天然拆分——强模型的判断力用在最高杠杆点，重复执行交给低成本模型；worker 复用浏览器内置的逆向方法论。
 - **模式二 · 经验库直驱（高模型带自建经验库、亲自调用）**：强模型用**自己的经验库 / 技能（skill）/ 方法论**，通过 `agent_call_tool` **亲自直调**浏览器的 44 个核心逆向工具（`signer_trace` / `jsvmp_trace` / `closure_read` / `page_eval` / 引擎级 hook…），跳过 worker。更快更准、可注入你自己的逆向经验；代价是每个工具回合花强模型的 token。
 
-两种模式共用同一套桥接与浏览器引擎，**可按任务、按步自由切换**。服务本身**零站点逻辑、不接触任何 API Key**（Key 仅在浏览器侧配置）。
+两种模式共用同一套桥接与浏览器引擎，**可按任务、按步自由切换**。0.3.0 起还可通过 MCP 管理 Firefox-Reverse 指纹环境（列表、新建、打开、关闭、导入采集 JSON），用 `FRX_ENV_ID` 启动指定独立 profile。服务本身**零站点逻辑、不接触任何 API Key**（Key 仅在浏览器侧配置）。
 
 ---
 
@@ -80,7 +80,7 @@
 director (Claude / GPT)
    │  stdio (MCP)
    ▼
-frx-director-mcp ──── 11 tools ──── BrowserBridge（Marionette 默认 / File 备用）
+frx-director-mcp ──── 21 tools ──── BrowserBridge（Marionette 默认 / File 备用）
    │  模式一: agent_start/send/read…      │  模式二: agent_tools + agent_call_tool
    │                                   │  TCP 127.0.0.1:2828 · chrome-context ExecuteScript
    │  每会话 convo / turnlog           ▼
@@ -166,6 +166,7 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 | `FRX_WORKSPACE_ROOT` | 会话工作目录根。**默认放在 firefox-reverse 仓库旁 `…/firefox-reverse-ws`**（从 `FRX_JSX_PROMPT_SRC` 推断仓库位置；推断不出则 `~/firefox-reverse-ws`），每个会话一个子目录 |
 | `FRX_DATA_DIR` | MCP 自身状态（convo / turnlog，非逆向产物），**默认 `~/.frx-director-mcp/data`** |
 | `FRX_AUTOLAUNCH` + `FRX_FIREFOX_BIN` / `FRX_PROFILE` | 由本服务自动拉起带 Marionette 的浏览器 |
+| `FRX_ENV_ID` / `FRX_ENVS_ROOT` | 绑定并启动指定 Firefox-Reverse 环境；默认环境根目录为 `~/.firefox-reverse/environments`，未设置 `FRX_ENV_ID` 时沿用 `FRX_PROFILE` 兼容路径 |
 
 > 📂 **逆向产物在哪里？** 工作目录归属 firefox-reverse 项目、而非 MCP 工具自身。默认每个会话的目录是 **`<firefox-reverse 仓库旁>/firefox-reverse-ws/<会话id>/`**（从 `FRX_JSX_PROMPT_SRC` 推断仓库位置；推断不出则 `~/firefox-reverse-ws/<会话id>/`）—— 抓取的脚本、还原代码、`ledger.md` / `progress.md` 都落在这里，与你从哪个目录启动无关；`agent_start` / `agent_read` 的返回也会带上该会话的**具体路径**。要改位置，设 `FRX_WORKSPACE_ROOT` 即可。
 
@@ -242,6 +243,16 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 |---|---|
 | `frx_status` | **首先调用** —— 自检：Marionette 是否连通、当前 worker provider / model、Key 是否已配置；未就绪时返回引导说明 |
 | `agent_tools` | 列出浏览器侧 44 个工具清单（名称 / 说明 / 是否需确认 / 参数名），含 16 个**引擎级**逆向工具（`signer_trace` / `jsvmp_trace` / `closure_read` / `webapi_trace` / `whitebox_diff` / `wasm_probe`…，页面检测不到）。两种模式都用：委派时照它写 guidance，直驱时照它填 `agent_call_tool` 的参数 |
+
+**指纹环境管理**
+
+| 工具 | 说明 |
+|---|---|
+| `frx_env_current` / `frx_env_list` | 查看当前连接环境与本机环境列表 |
+| `frx_env_create` / `frx_env_rename` | 新建 Chrome-like/Firefox 环境，或重命名已有环境 |
+| `frx_env_open` / `frx_env_close` / `frx_env_delete` | 打开、关闭、删除独立 profile + 独立进程环境 |
+| `frx_env_import_json` / `frx_env_import_capture` | 导入完整环境 JSON 或外部浏览器采集到的 fingerprint JSON |
+| `frx_page_automation_scan` | 扫描当前页常见自动化暴露点，辅助比较手动启动与 MCP 启动差异 |
 
 **模式一 · 领航委派**（强模型下方向，worker 执行）
 
