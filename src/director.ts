@@ -188,7 +188,7 @@ export class Director {
       started,
       runResult: r,
       hint: started
-        ? "worker 已开始磨。用 agent_wait_for_stop 等阶段门，再 agent_read 看结论。"
+        ? "worker 已开始磨。GPT/CLI 委派模式下一步必须短轮询:先 agent_poll({tid}) 或 agent_wait_for_stop({tid}), settled 后立刻 agent_read_brief/agent_read。不要在 agent_start 后停住。"
         : "run() 未确认启动（可能上一轮还在跑或时序竞争）——用 agent_state 查，必要时 agent_stop 后重试。",
     };
   }
@@ -200,6 +200,42 @@ export class Director {
       intervalSec: args.intervalSec ?? 10,
       log: this.log,
     });
+  }
+
+  async poll(args: {
+    tid: string;
+    timeoutSec?: number;
+    intervalSec?: number;
+    readOnSettled?: boolean;
+    stepTail?: number;
+    contentChars?: number;
+  }) {
+    const wait = await this.waitForStop({
+      tid: args.tid,
+      timeoutSec: args.timeoutSec ?? 60,
+      intervalSec: args.intervalSec ?? 5,
+    });
+    const nextAction =
+      wait.phase === "settled"
+        ? "call agent_read_brief or use brief already returned"
+        : wait.phase === "running"
+          ? "call agent_poll again; do not call agent_send until settled"
+          : wait.phase === "error"
+            ? "call agent_read_brief and agent_runlog to inspect the failure"
+            : "call agent_state; if no-state persists, recover from progress.md / ledger.md";
+    const out: Record<string, unknown> = {
+      ...wait,
+      shortPoll: true,
+      nextAction,
+    };
+    if (wait.phase === "settled" && args.readOnSettled !== false) {
+      out.brief = await this.readBrief({
+        tid: args.tid,
+        stepTail: args.stepTail,
+        contentChars: args.contentChars,
+      });
+    }
+    return out;
   }
 
   async read(args: { tid: string; includeProgressFile?: boolean; stepTail?: number; contentChars?: number }) {
@@ -229,6 +265,20 @@ export class Director {
       out.ledgerMd = readFileSafe(join(s.workspaceRoot, "ledger.md"), 8000);
     }
     return out;
+  }
+
+  async readBrief(args: { tid: string; stepTail?: number; contentChars?: number }) {
+    const out = await this.read({
+      tid: args.tid,
+      includeProgressFile: false,
+      stepTail: args.stepTail ?? 5,
+      contentChars: args.contentChars ?? 2000,
+    });
+    return {
+      ...out,
+      brief: true,
+      nextAction: "If settled=true, summarize content for the user or call agent_send with the next direction. If running=true, call agent_poll.",
+    };
   }
 
   async state(args: { tid: string }) {

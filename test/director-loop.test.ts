@@ -127,6 +127,30 @@ describe("Director loop", () => {
     expect(w.stillGrinding).toBe(true);
   });
 
+  it("poll short-waits and tells CLI clients to keep polling while running", async () => {
+    const r = await d.start({ task: "t" }); // leaves the turn running
+    const p = (await d.poll({ tid: r.tid, intervalSec: 0.1, timeoutSec: 0.2 })) as {
+      phase: string;
+      shortPoll: boolean;
+      nextAction: string;
+    };
+    expect(p.phase).toBe("running");
+    expect(p.shortPoll).toBe(true);
+    expect(p.nextAction).toContain("agent_poll");
+  });
+
+  it("poll returns a compact read when the worker has settled", async () => {
+    const r = await d.start({ task: "t" });
+    bridge.settle(r.tid, "阶段结论: 已完成首轮验证", [{ k: "tool", n: "page_eval", t: "ok", ok: true }]);
+    const p = (await d.poll({ tid: r.tid, intervalSec: 0.1, timeoutSec: 1 })) as {
+      phase: string;
+      brief?: { brief: boolean; content: string };
+    };
+    expect(p.phase).toBe("settled");
+    expect(p.brief?.brief).toBe(true);
+    expect(p.brief?.content).toContain("阶段结论");
+  });
+
   it("send carries the FULL conclusion forward (no 3800 truncation) + appends guidance", async () => {
     const r = await d.start({ task: "t" });
     const longConclusion = "结论A".repeat(2000); // 6000 chars > contentTail cap
@@ -147,6 +171,27 @@ describe("Director loop", () => {
     bridge.settle(r.tid, "我打算先提取 vendor 的 bootstrapper…", [{ k: "text", n: null, t: "plan", ok: true }]);
     const rd = (await d.read({ tid: r.tid })) as { driftHint: { likelyDrift: boolean } };
     expect(rd.driftHint.likelyDrift).toBe(true);
+  });
+
+  it("readBrief keeps output compact and skips progress files", async () => {
+    const r = await d.start({ task: "t" });
+    bridge.settle(
+      r.tid,
+      "A".repeat(5000),
+      Array.from({ length: 10 }, (_, i) => ({ k: "text", n: null, t: `step-${i}`, ok: true })),
+    );
+    const rd = (await d.readBrief({ tid: r.tid, stepTail: 2, contentChars: 100 })) as {
+      brief: boolean;
+      content: string;
+      steps: unknown[];
+      progressMd?: string;
+      ledgerMd?: string;
+    };
+    expect(rd.brief).toBe(true);
+    expect(rd.content.length).toBe(100);
+    expect(rd.steps.length).toBe(2);
+    expect(rd.progressMd).toBeUndefined();
+    expect(rd.ledgerMd).toBeUndefined();
   });
 
   it("set_mode persists assist/auto", async () => {

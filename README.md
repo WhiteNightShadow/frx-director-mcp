@@ -19,7 +19,7 @@
 - **模式一 · 领航委派（高模型配置、低模型调用）**：强模型当 director 只**下方向、审结论**；**便宜的 worker 模型**（DeepSeek-flash / Qwen-turbo / GLM）在浏览器里**执行全部工具**（抓包、签名追踪、补环境、脚本验证…）。token 天然拆分——强模型的判断力用在最高杠杆点，重复执行交给低成本模型；worker 复用浏览器内置的逆向方法论。
 - **模式二 · 经验库直驱（高模型带自建经验库、亲自调用）**：强模型用**自己的经验库 / 技能（skill）/ 方法论**，通过 `agent_call_tool` **亲自直调**浏览器的 44 个核心逆向工具（`signer_trace` / `jsvmp_trace` / `closure_read` / `page_eval` / 引擎级 hook…），跳过 worker。更快更准、可注入你自己的逆向经验；代价是每个工具回合花强模型的 token。
 
-两种模式共用同一套桥接与浏览器引擎，**可按任务、按步自由切换**。0.3.0 起还可通过 MCP 管理 Firefox-Reverse 指纹环境（列表、新建、打开、关闭、导入采集 JSON），用 `FRX_ENV_ID` 启动指定独立 profile。服务本身**零站点逻辑、不接触任何 API Key**（Key 仅在浏览器侧配置）。
+两种模式共用同一套桥接与浏览器引擎，**可按任务、按步自由切换**。0.3.0 起还可通过 MCP 管理 Firefox-Reverse 指纹环境（列表、新建、打开、关闭、导入采集 JSON），用 `FRX_ENV_ID` 启动指定独立 profile。0.3.2 起为 CLI 主模型补齐 `agent_poll` / `agent_read_brief`，避免 `agent_start` 后主模型停住不读结果。服务本身**零站点逻辑、不接触任何 API Key**（Key 仅在浏览器侧配置）。
 
 ---
 
@@ -52,8 +52,8 @@
   强模型 director (Claude / GPT)                  firefox-reverse 浏览器
   ┌───────────────────────┐    MCP / stdio     ┌──────────────────────────────┐
   │ ① agent_start  下目标  │ ─────────────────▶ │ worker 模型(便宜)执行 44 工具 │
-  │ ② agent_wait_for_stop │                    │ 抵达阶段门 → 产出阶段结论       │
-  │ ③ agent_read   审阅    │ ◀───────────────── │                              │
+  │ ② agent_poll 短轮询    │                    │ 抵达阶段门 → 产出阶段结论       │
+  │ ③ agent_read_brief/read│ ◀───────────────── │                              │
   │ ④ agent_send   纠方向  │ ─────────────────▶ │ 按新方向继续                  │
   └───────────────────────┘                    └──────────────────────────────┘
         └──────────── 循环 ②~④，直到产出可独立运行的结果 ────────────┘
@@ -192,8 +192,11 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
   在 task 中给出你的判型与方法建议：简单站点优先 hook 比对标准算法、不必硬扣混淆；JSVMP 不逆字节码、走黑盒补环境；不臆测函数名，先 signer_trace 抓取真实入参。
 
 【第 3 步 · 等待与审阅】
-  agent_wait_for_stop({tid}) 等待 worker 抵达阶段门（可能 10–30 分钟；phase:"running" 仅表示仍在执行、并非失败，可继续等待或先 agent_read 查看）。
-  agent_read({tid}) 读取阶段结论 + progress.md / ledger.md + driftHint / runlogTail。
+  CLI/命令行客户端优先循环调用 agent_poll({tid, timeoutSec:60, intervalSec:5})。
+  - phase:"running" → worker 仍在执行，不是失败；继续 agent_poll，不要停住等用户提醒。
+  - phase:"settled" → 先使用返回里的 brief；若需要完整产物再 agent_read({tid, includeProgressFile:true})。
+  - phase:"error" 或 no-state → agent_read_brief({tid}) + agent_runlog({tail:30}) 做诊断。
+  支持长等待的客户端也可直接 agent_wait_for_stop({tid})；但 settled 后仍必须 agent_read_brief 或 agent_read。
   ★采信结论前务必查看 driftHint：勿将「模型漂移为纯文本 / idle 超时」误判为「路线确属不通」（worker 的首要失败模式）。
 
 【第 4 步 · 方向修正】agent_send({tid, guidance:"..."}) 写一条具体、有序、可防止走弯路的指令，例如：
@@ -259,8 +262,10 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 
 | 工具 | 说明 |
 |---|---|
-| `agent_start` | 创建会话：绑定工作目录、选择 AI 辅助模式、导航至目标、下达首轮任务（仅校验 `hasKey`，不接触 Key）|
+| `agent_start` | 创建会话：绑定工作目录、选择 AI 辅助模式、导航至目标、下达首轮任务（仅校验 `hasKey`，不接触 Key）。返回后主模型必须继续 `agent_poll` / `agent_wait_for_stop`，settled 后必须读取结果 |
+| `agent_poll` | CLI 友好的短轮询：默认最多等 60 秒，仍在跑返回 `phase:"running"` 和下一步提示；settled 时默认附带 `agent_read_brief` 结果，避免主模型启动后停住 |
 | `agent_wait_for_stop` | 阻塞至 worker 抵达阶段门（`settled`）；超时仍运行则返回 `phase:"running"`（继续等待，非失败）|
+| `agent_read_brief` | 简短读取阶段结论，默认不带 `progress.md` / `ledger.md`，只取最近 5 步和 2000 字，适合 CLI 主模型快速续上 |
 | `agent_read` | 读取阶段结论 + `progress.md` / `ledger.md` + `driftHint` / `runlogTail` |
 | `agent_state` | 轻量存活 / 进度快照 |
 | `agent_send` | **委派模式核心动作** —— 携带上轮结论、追加方向指令、发起下一轮 |
@@ -275,6 +280,11 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 | `agent_call_tool` | **直驱核心动作** —— 强模型亲自直调一个浏览器引擎工具（跳过 worker）。先 `agent_tools` 查 `name`/参数，再 `agent_call_tool({name, args})`。返回工具信封（`ok`/`data`/`error`，永不抛、已校验未知工具与缺参）。⚠ 有 worker 会话运行时被拒绝（共享页面 / hook 状态）；需 firefox-reverse **v0.20.0+** |
 
 ## 📝 版本更新记录
+
+### v0.3.2（2026-07-07，main 补丁）
+- **CLI 委派闭环增强**：新增 `agent_poll`，把「短等待状态」和「settled 后简短读取」合成一个动作，降低 GPT/CLI 在 `agent_start` 后停住不读结果的概率。
+- **简短结果读取**：新增 `agent_read_brief`，默认只读最近 5 步与 2000 字阶段结论，不加载 `progress.md` / `ledger.md`，避免大输出让命令行主模型卡住或跳步。
+- **软强制提示**：`agent_start`、工具描述和一键提示词明确要求 `agent_start → agent_poll/agent_wait_for_stop → agent_read_brief/agent_read`，但不做硬拦截，保留外部编排、人工检查和长等待客户端的自由度。
 
 ### v0.3.1（2026-07-07，main 补丁）
 - **三端 autolaunch 加固**：`FRX_AUTOLAUNCH=1` 启动时先检查 Marionette 端口，启动后等待端口 ready，不再把 `spawn` 成功误判为浏览器可用。

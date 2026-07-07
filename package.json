@@ -1,6 +1,6 @@
 {
   "name": "frx-director-mcp",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "private": true,
   "description": "MCP server for the firefox-reverse browser Agent and fingerprint environments. Delegate to the cheap worker, direct-drive engine tools, or select/create/import isolated FRX_ENV_ID environments.",
   "type": "module",

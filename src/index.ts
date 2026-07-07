@@ -82,7 +82,7 @@ async function main(): Promise<void> {
   // first tool that needs the browser; frx_status reports connectivity on demand.
 
   const director = new Director(bridge, config);
-  const server = new McpServer({ name: "frx-director-mcp", version: "0.3.0" });
+  const server = new McpServer({ name: "frx-director-mcp", version: "0.3.2" });
   registerTools(server, director);
 
   const transport = new StdioServerTransport();

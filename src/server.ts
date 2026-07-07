@@ -188,6 +188,7 @@ export function registerTools(server: McpServer, director: Director): void {
       title: "Start a worker session",
       description:
         "开一个新的逆向会话:配置 worker 模型(默认沿用浏览器里已配的)+关掉工具确认门、(可选)导航到目标 URL、建工作目录、用便宜的 worker 模型以【AI 辅助模式】发出第一轮(task 作为第 0 条 user)。返回 tid,后续都用它。" +
+        "★重要:GPT/CLI 委派模式下,agent_start 返回后必须继续 agent_poll/agent_wait_for_stop,settled 后必须 agent_read_brief/agent_read;不要启动后停住等用户提醒。" +
         "绝不读/写 worker 的 key——key 由用户预先在浏览器里配好;这里只校验 hasKey=true。worker 选标准/快档别选推理档(推理档在长工具循环里易漂移成纯文字),如 deepseek-v4-flash / qwen-turbo / glm。",
       inputSchema: {
         task: z.string().describe("逆向目标(成为 convo[0] 的 user 内容),例如:还原 xxx.com 的 X-S 签名并 Node 实打接口"),
@@ -233,6 +234,31 @@ export function registerTools(server: McpServer, director: Director): void {
   );
 
   server.registerTool(
+    "agent_poll",
+    {
+      title: "Short-poll a worker turn for CLI clients",
+      description:
+        "CLI 友好的短轮询:最多等 30-120 秒查看 worker 是否 settled,避免一次 agent_wait_for_stop 长等 5400s 导致命令行无进度。" +
+        "默认 timeoutSec=60、intervalSec=5; 若 settled 且 readOnSettled 未设 false,会自动附带 brief 结论。agent_start 后推荐优先循环调用它。",
+      inputSchema: {
+        tid: z.string(),
+        timeoutSec: z.number().optional().describe("默认 60 秒；CLI 建议 30-120"),
+        intervalSec: z.number().optional().describe("默认 5 秒"),
+        readOnSettled: z.boolean().optional().describe("默认 true；settled 后自动带 agent_read_brief 结果"),
+        stepTail: z.number().optional().describe("settled 后 brief 返回最近多少步，默认 5"),
+        contentChars: z.number().optional().describe("settled 后 brief content 上限，默认 2000"),
+      },
+    },
+    async (a) => {
+      try {
+        return ok(await director.poll(a));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "agent_read",
     {
       title: "Read the worker's stage conclusion",
@@ -249,6 +275,28 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => {
       try {
         return ok(await director.read(a));
+      } catch (e) {
+        return err(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "agent_read_brief",
+    {
+      title: "Read a compact worker conclusion",
+      description:
+        "CLI 友好的简短读取:等价于 agent_read({includeProgressFile:false, stepTail:5, contentChars:2000})。" +
+        "用于 settled 后快速把 worker 结论交给主模型,避免 progress.md/ledger.md 或大 steps 输出让某些 CLI 卡住。",
+      inputSchema: {
+        tid: z.string(),
+        stepTail: z.number().optional().describe("默认 5"),
+        contentChars: z.number().optional().describe("默认 2000"),
+      },
+    },
+    async (a) => {
+      try {
+        return ok(await director.readBrief(a));
       } catch (e) {
         return err(e);
       }
