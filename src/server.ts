@@ -188,7 +188,7 @@ export function registerTools(server: McpServer, director: Director): void {
       title: "Start a worker session",
       description:
         "开一个新的逆向会话:配置 worker 模型(默认沿用浏览器里已配的)+关掉工具确认门、(可选)导航到目标 URL、建工作目录、用便宜的 worker 模型以【AI 辅助模式】发出第一轮(task 作为第 0 条 user)。返回 tid,后续都用它。" +
-        "★重要:GPT/CLI 委派模式下,agent_start 返回后必须继续 agent_poll/agent_wait_for_stop,settled 后必须 agent_read_brief/agent_read;不要启动后停住等用户提醒。" +
+        "推荐流程:GPT/CLI 委派模式下,agent_start 返回后继续 agent_poll/agent_wait_for_stop 观察阶段状态,settled 后用 agent_read_brief/agent_read 读取结论。" +
         "绝不读/写 worker 的 key——key 由用户预先在浏览器里配好;这里只校验 hasKey=true。worker 选标准/快档别选推理档(推理档在长工具循环里易漂移成纯文字),如 deepseek-v4-flash / qwen-turbo / glm。",
       inputSchema: {
         task: z.string().describe("逆向目标(成为 convo[0] 的 user 内容),例如:还原 xxx.com 的 X-S 签名并 Node 实打接口"),

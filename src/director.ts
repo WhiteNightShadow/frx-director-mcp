@@ -188,7 +188,7 @@ export class Director {
       started,
       runResult: r,
       hint: started
-        ? "worker 已开始磨。GPT/CLI 委派模式下一步必须短轮询:先 agent_poll({tid}) 或 agent_wait_for_stop({tid}), settled 后立刻 agent_read_brief/agent_read。不要在 agent_start 后停住。"
+        ? "worker 已开始磨。GPT/CLI 委派模式推荐下一步:先 agent_poll({tid}) 短轮询,或用 agent_wait_for_stop({tid}) 长等待; settled 后用 agent_read_brief/agent_read 读取结论。"
         : "run() 未确认启动（可能上一轮还在跑或时序竞争）——用 agent_state 查，必要时 agent_stop 后重试。",
     };
   }
@@ -217,9 +217,9 @@ export class Director {
     });
     const nextAction =
       wait.phase === "settled"
-        ? "call agent_read_brief or use brief already returned"
+        ? "use brief already returned, or call agent_read_brief / agent_read for more detail"
         : wait.phase === "running"
-          ? "call agent_poll again; do not call agent_send until settled"
+          ? "worker is still running; call agent_poll again or agent_wait_for_stop before sending new guidance"
           : wait.phase === "error"
             ? "call agent_read_brief and agent_runlog to inspect the failure"
             : "call agent_state; if no-state persists, recover from progress.md / ledger.md";

@@ -193,10 +193,10 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 
 【第 3 步 · 等待与审阅】
   CLI/命令行客户端优先循环调用 agent_poll({tid, timeoutSec:60, intervalSec:5})。
-  - phase:"running" → worker 仍在执行，不是失败；继续 agent_poll，不要停住等用户提醒。
+  - phase:"running" → worker 仍在执行，不是失败；继续 agent_poll，或改用 agent_wait_for_stop 长等待。
   - phase:"settled" → 先使用返回里的 brief；若需要完整产物再 agent_read({tid, includeProgressFile:true})。
   - phase:"error" 或 no-state → agent_read_brief({tid}) + agent_runlog({tail:30}) 做诊断。
-  支持长等待的客户端也可直接 agent_wait_for_stop({tid})；但 settled 后仍必须 agent_read_brief 或 agent_read。
+  支持长等待的客户端也可直接 agent_wait_for_stop({tid})；settled 后用 agent_read_brief 或 agent_read 读取结论。
   ★采信结论前务必查看 driftHint：勿将「模型漂移为纯文本 / idle 超时」误判为「路线确属不通」（worker 的首要失败模式）。
 
 【第 4 步 · 方向修正】agent_send({tid, guidance:"..."}) 写一条具体、有序、可防止走弯路的指令，例如：
@@ -262,7 +262,7 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 
 | 工具 | 说明 |
 |---|---|
-| `agent_start` | 创建会话：绑定工作目录、选择 AI 辅助模式、导航至目标、下达首轮任务（仅校验 `hasKey`，不接触 Key）。返回后主模型必须继续 `agent_poll` / `agent_wait_for_stop`，settled 后必须读取结果 |
+| `agent_start` | 创建会话：绑定工作目录、选择 AI 辅助模式、导航至目标、下达首轮任务（仅校验 `hasKey`，不接触 Key）。推荐返回后继续 `agent_poll` / `agent_wait_for_stop`，settled 后读取结果 |
 | `agent_poll` | CLI 友好的短轮询：默认最多等 60 秒，仍在跑返回 `phase:"running"` 和下一步提示；settled 时默认附带 `agent_read_brief` 结果，避免主模型启动后停住 |
 | `agent_wait_for_stop` | 阻塞至 worker 抵达阶段门（`settled`）；超时仍运行则返回 `phase:"running"`（继续等待，非失败）|
 | `agent_read_brief` | 简短读取阶段结论，默认不带 `progress.md` / `ledger.md`，只取最近 5 步和 2000 字，适合 CLI 主模型快速续上 |
@@ -284,7 +284,7 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 ### v0.3.2（2026-07-07，main 补丁）
 - **CLI 委派闭环增强**：新增 `agent_poll`，把「短等待状态」和「settled 后简短读取」合成一个动作，降低 GPT/CLI 在 `agent_start` 后停住不读结果的概率。
 - **简短结果读取**：新增 `agent_read_brief`，默认只读最近 5 步与 2000 字阶段结论，不加载 `progress.md` / `ledger.md`，避免大输出让命令行主模型卡住或跳步。
-- **软强制提示**：`agent_start`、工具描述和一键提示词明确要求 `agent_start → agent_poll/agent_wait_for_stop → agent_read_brief/agent_read`，但不做硬拦截，保留外部编排、人工检查和长等待客户端的自由度。
+- **流程提示增强**：`agent_start`、工具描述和一键提示词补充 `agent_start → agent_poll/agent_wait_for_stop → agent_read_brief/agent_read` 的推荐闭环，不做底层硬拦截，保留外部编排、人工检查和长等待客户端的自由度。
 
 ### v0.3.1（2026-07-07，main 补丁）
 - **三端 autolaunch 加固**：`FRX_AUTOLAUNCH=1` 启动时先检查 Marionette 端口，启动后等待端口 ready，不再把 `spawn` 成功误判为浏览器可用。
