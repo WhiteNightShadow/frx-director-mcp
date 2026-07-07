@@ -53,14 +53,24 @@ async function main(): Promise<void> {
     if (!res.reachable) {
       logErr(
         `Marionette ${config.marionetteHost}:${launch.port} 不可达。` +
-          "请用 `-marionette -remote-allow-system-access -profile <PROFILE>` 启动 Firefox Reverse," +
-          "或设 FRX_AUTOLAUNCH=1 + FRX_FIREFOX_BIN。",
+          (res.note ? ` ${res.note}。` : "") +
+          (res.command ? ` launch=${res.command}` : "") +
+          (res.earlyExit
+            ? ` earlyExit=${JSON.stringify({
+                code: res.earlyExit.code,
+                signal: res.earlyExit.signal,
+                error: res.earlyExit.error,
+                stderr: res.earlyExit.stderr,
+              })}`
+            : "") +
+          "请确认 Firefox Reverse 已安装、profile 未被其它进程占用；macOS 建议 FRX_FIREFOX_BIN 指向 .app 或 .app/Contents/MacOS/firefox 并设 FRX_AUTOLAUNCH=1。",
       );
     } else {
       logErr(
         `Marionette reachable on ${config.marionetteHost}:${launch.port}` +
           (launch.envId ? ` env=${launch.envId}` : "") +
-          (res.launched ? " (launched)" : ""),
+          (res.launched ? ` (launched via ${res.method || "unknown"})` : "") +
+          (res.removedProfileLocks?.length ? ` removedLocks=${res.removedProfileLocks.length}` : ""),
       );
     }
   }

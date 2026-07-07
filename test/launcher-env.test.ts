@@ -2,13 +2,48 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveBrowserLaunch } from "../src/launcher.js";
+import { buildFirefoxArgs, buildLaunchCommand, resolveBrowserLaunch } from "../src/launcher.js";
 
 function writeJSON(path: string, data: unknown): void {
   writeFileSync(path, JSON.stringify(data, null, 2));
 }
 
 describe("launcher environment resolution", () => {
+  it("uses LaunchServices for macOS app bundles", () => {
+    const args = buildFirefoxArgs(2828, "/Users/me/Profile");
+    const command = buildLaunchCommand({
+      firefoxBin: "/Applications/Firefox Reverse.app/Contents/MacOS/firefox",
+      args,
+      platform: "darwin",
+      processLabel: "Firefox Reverse 1",
+    });
+
+    expect(command.method).toBe("macos-open");
+    expect(command.command).toBe("open");
+    expect(command.browserPidReliable).toBe(false);
+    expect(command.args.slice(0, 4)).toEqual(["-n", "-a", "/Applications/Firefox Reverse.app", "--args"]);
+    expect(command.args).toContain("-marionette");
+    expect(command.args).toContain("-profile");
+    expect(command.args).toContain("/Users/me/Profile");
+  });
+
+  it("keeps direct executable launch on non-macOS platforms", () => {
+    const args = buildFirefoxArgs(2829, "C:\\frx\\profile");
+    const command = buildLaunchCommand({
+      firefoxBin: "C:\\Program Files\\Firefox Reverse\\firefox.exe",
+      args,
+      platform: "win32",
+      processLabel: "Firefox Reverse 2",
+    });
+
+    expect(command.method).toBe("direct");
+    expect(command.command).toBe("C:\\Program Files\\Firefox Reverse\\firefox.exe");
+    expect(command.argv0).toBe("Firefox Reverse 2");
+    expect(command.browserPidReliable).toBe(true);
+    expect(command.args).toContain("--marionette-port");
+    expect(command.args).toContain("2829");
+  });
+
   it("keeps the legacy profile path when FRX_ENV_ID is unset", async () => {
     const launch = await resolveBrowserLaunch({
       host: "127.0.0.1",
