@@ -274,6 +274,25 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 |---|---|
 | `agent_call_tool` | **直驱核心动作** —— 强模型亲自直调一个浏览器引擎工具（跳过 worker）。先 `agent_tools` 查 `name`/参数，再 `agent_call_tool({name, args})`。返回工具信封（`ok`/`data`/`error`，永不抛、已校验未知工具与缺参）。⚠ 有 worker 会话运行时被拒绝（共享页面 / hook 状态）；需 firefox-reverse **v0.20.0+** |
 
+## 📝 版本更新记录
+
+### v0.3.1（2026-07-07，main 补丁）
+- **三端 autolaunch 加固**：`FRX_AUTOLAUNCH=1` 启动时先检查 Marionette 端口，启动后等待端口 ready，不再把 `spawn` 成功误判为浏览器可用。
+- **macOS 启动修复**：当 `FRX_FIREFOX_BIN` 指向 `/Applications/Firefox Reverse.app` 或 `.app/Contents/MacOS/firefox` 时，自动转换为 `open -n -a "...app" --args ...`，避免直接拉二进制导致 Firefox Reverse 短暂启动后退出。
+- **profile 锁处理**：启动前检测 `.parentlock` / `parent.lock` / `lock`；确认没有真实进程占用时才清理 stale lock，避免误删正在使用的 profile 锁。
+- **失败诊断增强**：记录启动方式、启动命令、早退 `exitCode/signal/stderr`、锁文件清理情况；`frx_status` 与 MCP stderr 提示改为明确指出 profile 占用、端口不可达或浏览器早退。
+- **本地验证**：新增 launcher 单测覆盖 macOS LaunchServices 与 Windows/Linux 直接可执行路径，并用临时 profile 实测 macOS autolaunch 可正常拉起 Marionette。
+
+### v0.3.0（2026-07-07）
+- **Firefox-Reverse 环境管理**：新增 `frx_env_current/list/create/rename/open/close/delete/import_json/import_capture`，可通过 MCP 管理指纹环境。
+- **指定环境启动**：支持 `FRX_ENV_ID` / `FRX_ENVS_ROOT`，读取环境 `env.json` 后使用独立 profile、指纹配置、代理配置、trace 目录与 Marionette 端口启动。
+- **自动化暴露扫描**：新增 `frx_page_automation_scan`，用于比较 MCP 启动与手动启动时的 WebDriver、UA-CH、plugins、permissions、WebGL/canvas/audio/WebRTC/storage 等暴露点。
+- **兼容旧模式**：未设置 `FRX_ENV_ID` 时继续沿用 `FRX_PROFILE`，保留原有委派模式与直驱模式。
+
+### v0.2.x
+- **直驱模式**：新增 `agent_tools` / `agent_call_tool`，强模型可以跳过 worker，亲自调用浏览器内置逆向工具。
+- **长任务稳定性**：强化阶段等待、运行日志、漂移提示和会话读取能力，降低长工具循环中断概率。
+
 ## 安全与约束
 
 - **不接触 API Key** —— Key 仅在浏览器侧配置；`agent_start` 仅校验 `hasKey` 布尔值；运行日志归档对疑似 Key 做脱敏处理。
