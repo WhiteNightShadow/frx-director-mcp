@@ -110,7 +110,7 @@ export class Director {
         error: String((e as Error)?.message ?? e),
         note:
           "连不上浏览器的 marionette(127.0.0.1:2828)。请用户用 " +
-          '`open -n -a "/Applications/Firefox Reverse.app" --args -marionette -remote-allow-system-access -no-remote --marionette-port 2828 -profile "<你的 profile>"` ' +
+          '`open -n -a "/Applications/Firefox Reverse.app" --args -marionette -remote-allow-system-access -no-remote -profile "<你的 profile>"` ' +
           "启动 Firefox Reverse；或设 FRX_AUTOLAUNCH=1+FRX_FIREFOX_BIN/FRX_PROFILE 让本 MCP 自动拉起。",
       };
     }

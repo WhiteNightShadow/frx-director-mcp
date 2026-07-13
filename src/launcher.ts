@@ -212,8 +212,8 @@ function macOSAppPath(firefoxBin: string): string {
   return m ? m[1] || "" : "";
 }
 
-export function buildFirefoxArgs(port: number, profile: string): string[] {
-  const args = ["-marionette", "-remote-allow-system-access", "-no-remote", "--marionette-port", String(port)];
+export function buildFirefoxArgs(_port: number, profile: string): string[] {
+  const args = ["-marionette", "-remote-allow-system-access", "-no-remote"];
   if (profile) args.push("-profile", profile);
   return args;
 }
@@ -547,6 +547,8 @@ export async function ensureBrowser(opts: {
     env: {
       ...process.env,
       MOZ_FRX_HIDE_REMOTE_CONTROL_CUE: "1",
+      MOZ_MARIONETTE: "1",
+      MOZ_MARIONETTE_PREF_STATE_ACROSS_RESTARTS: JSON.stringify({ "marionette.port": opts.port }),
       ...automationFingerprintEnv(extraEnv),
       ...extraEnv,
     },

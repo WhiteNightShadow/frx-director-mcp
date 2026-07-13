@@ -40,8 +40,9 @@ describe("launcher environment resolution", () => {
     expect(command.command).toBe("C:\\Program Files\\Firefox Reverse\\firefox.exe");
     expect(command.argv0).toBe("Firefox Reverse 2");
     expect(command.browserPidReliable).toBe(true);
-    expect(command.args).toContain("--marionette-port");
-    expect(command.args).toContain("2829");
+    expect(command.args).not.toContain("--marionette-port");
+    expect(command.args).toContain("-marionette");
+    expect(command.args).toContain("C:\\frx\\profile");
   });
 
   it("keeps the legacy profile path when FRX_ENV_ID is unset", async () => {
