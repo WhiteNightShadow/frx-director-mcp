@@ -253,7 +253,7 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 | 工具 | 说明 |
 |---|---|
 | `frx_env_current` / `frx_env_list` | 查看当前连接环境与本机环境列表 |
-| `frx_env_create` / `frx_env_rename` | 新建 Chrome-like/Firefox 环境，或重命名已有环境 |
+| `frx_env_create` / `frx_env_rename` | 新建与内核一致的 Firefox 环境（默认中国大陆简体中文），或重命名已有环境 |
 | `frx_env_open` / `frx_env_close` / `frx_env_delete` | 打开、关闭、删除独立 profile + 独立进程环境 |
 | `frx_env_import_json` / `frx_env_import_capture` | 导入完整环境 JSON 或外部浏览器采集到的 fingerprint JSON |
 | `frx_page_automation_scan` | 扫描当前页常见自动化暴露点，辅助比较手动启动与 MCP 启动差异 |
@@ -280,6 +280,11 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 | `agent_call_tool` | **直驱核心动作** —— 强模型亲自直调一个浏览器引擎工具（跳过 worker）。先 `agent_tools` 查 `name`/参数，再 `agent_call_tool({name, args})`。返回工具信封（`ok`/`data`/`error`，永不抛、已校验未知工具与缺参）。⚠ 有 worker 会话运行时被拒绝（共享页面 / hook 状态）；需 firefox-reverse **v0.20.0+** |
 
 ## 📝 版本更新记录
+
+### v0.3.4（2026-07-29）
+- **Firefox-only 环境创建**：`frx_env_create` 不再接受浏览器内核类型，新环境始终使用与 Firefox Reverse 内核一致的 Firefox 指纹。
+- **中文地区参数**：新建环境默认中国大陆简体中文，并支持传入 `language`、`languages`、`locale` 和 `timezone` 自定义地区组合。
+- **兼容历史环境**：已有环境的指纹文件和 profile 不会因 MCP 升级而自动修改；新增测试覆盖默认值、自定义值和旧环境兼容路径。
 
 ### v0.3.3（2026-07-13，main 补丁）
 - **Marionette 端口修复**：移除 Firefox 153 不识别的 `--marionette-port` 启动参数，改用 `MOZ_MARIONETTE_PREF_STATE_ACROSS_RESTARTS` 注入 `marionette.port`，保证 Windows、macOS、Linux 以及多指纹环境使用各自端口。

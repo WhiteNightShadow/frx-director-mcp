@@ -75,17 +75,26 @@ export function registerTools(server: McpServer, director: Director): void {
     "frx_env_create",
     {
       title: "Create a Firefox Reverse environment",
-      description: "一键新建环境；默认随机生成一组 Chrome-like 桌面指纹参数。",
+      description: "一键新建 Firefox 环境；内核版本和系统跟随 Firefox Reverse，默认中国大陆简体中文。",
       inputSchema: {
         name: z.string().optional().describe("环境名称"),
-        randomize: z.boolean().optional().describe("默认 true，随机生成一致的桌面参数"),
-        browser: z.string().optional().describe("默认 chromium；也可传 firefox"),
+        randomize: z.boolean().optional().describe("默认 true，只随机分辨率、DPR 和 CPU 核数等非身份参数"),
+        language: z.string().optional().describe("首选语言，如 zh-CN"),
+        languages: z.array(z.string()).optional().describe("语言列表，如 [zh-CN, zh, en-US, en]"),
+        locale: z.string().optional().describe("地区标识，如 zh-CN"),
+        timezone: z.string().optional().describe("时区，如 Asia/Shanghai"),
       },
     },
     async (a) =>
       callEnvTool("env_create", {
         name: a.name,
-        generateOptions: { randomize: a.randomize !== false, browser: a.browser || "chromium" },
+        generateOptions: {
+          randomize: a.randomize !== false,
+          language: a.language,
+          languages: a.languages,
+          locale: a.locale,
+          timezone: a.timezone,
+        },
       }),
   );
 
@@ -144,7 +153,7 @@ export function registerTools(server: McpServer, director: Director): void {
     {
       title: "Import a full Firefox Reverse environment JSON",
       description:
-        "导入完整环境 JSON。支持 {name,id,fingerprint,proxy,generateOptions} 或 {env,fingerprint,proxy}；id 已存在时需 overwrite:true。",
+        "导入完整环境 JSON。新环境只接受 Firefox 指纹；支持 {name,id,fingerprint,proxy,generateOptions} 或 {env,fingerprint,proxy}，id 已存在时需 overwrite:true。",
       inputSchema: {
         id: z.string().optional().describe("可选；指定导入到哪个环境 id"),
         name: z.string().optional().describe("可选；覆盖导入后的环境名称"),
