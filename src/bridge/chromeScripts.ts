@@ -137,33 +137,47 @@ return { ok:true, stopped:true, wasRunning: agentSession.isRunning(tid) };
 /**
  * Enumerate the worker's browser-side tool catalog (name / description / confirm /
  * param names) for director VISIBILITY only — handlers are never invoked here.
- * Passes proxy stub backends so every tool passes its _need(backends) gate (so we
- * get the FULL declared surface, not just whatever backends happen to be wired),
- * and falls back to declaredToolNames() for the authoritative name list. Defensive
- * against older browser builds that may lack a given export.
+ * Uses the browser's live getBackends() registry so this catalog is identical to
+ * the worker's real ToolRouter surface. Older builds fall back to a recursive
+ * proxy that satisfies every backend gate (unlike the old fixed stub list, which
+ * silently omitted newly added notes/ledger/skill/env/webapi/find tools).
  */
 export const JS_TOOLS = `
 const mod = ChromeUtils.importESModule(${JSON.stringify(MOD("Tools"))});
-const stub = function(){ return new Proxy({}, { get: function(){ return function(){}; } }); };
-const backends = { page:stub(), code:stub(), net:stub(), scripts:stub(), jsvmp:stub(), workspace:stub(), cookies:stub() };
 let tools = [];
 try {
-  tools = (mod.createBuiltinTools(backends) || []).map(function(t){
-    let params = [];
-    try { if (t.parameters && t.parameters.properties) params = Object.keys(t.parameters.properties); } catch (e) {}
-    return { name: t.name,
-             description: String((t && t.description) || "").slice(0, 300),
-             needsConfirm: !!t.needsConfirm,
-             params: params };
-  });
-} catch (e) {}
+  const backendsMod = ChromeUtils.importESModule(${JSON.stringify(MOD("Backends"))});
+  tools = mod.createBuiltinTools(backendsMod.getBackends()) || [];
+} catch (e) {
+  try {
+    let callable;
+    callable = new Proxy(function(){}, {
+      get: function(){ return callable; },
+      apply: function(){ return {}; }
+    });
+    const allBackends = new Proxy({}, { get: function(){ return callable; } });
+    tools = mod.createBuiltinTools(allBackends) || [];
+  } catch (fallbackError) {}
+}
+tools = tools.map(function(t){
+  let params = [];
+  try { if (t.parameters && t.parameters.properties) params = Object.keys(t.parameters.properties); } catch (e) {}
+  return { name: t.name,
+           description: String((t && t.description) || "").slice(0, 300),
+           needsConfirm: !!t.needsConfirm,
+           params: params };
+});
 let declaredNames = [];
 try {
   declaredNames = (typeof mod.declaredToolNames === "function")
     ? mod.declaredToolNames()
     : tools.map(function(t){ return t.name; });
 } catch (e) {}
-return { tools: tools, declaredNames: declaredNames, count: tools.length };
+const liveNames = tools.map(function(t){ return t.name; });
+return { tools: tools,
+         declaredNames: declaredNames,
+         missingDeclared: declaredNames.filter(function(name){ return liveNames.indexOf(name) < 0; }),
+         count: tools.length };
 `;
 
 /**

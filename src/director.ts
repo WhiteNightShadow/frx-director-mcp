@@ -9,6 +9,16 @@ import type { Config } from "./config.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+export interface StartupDiagnostic {
+  phase: "resolving" | "registered" | "starting" | "ready" | "degraded";
+  port: number;
+  envId?: string;
+  launched?: boolean;
+  reachable?: boolean;
+  note?: string;
+  error?: string;
+}
+
 function slug(s: string): string {
   return (
     s
@@ -71,6 +81,7 @@ export class Director {
   constructor(
     private bridge: BrowserBridge,
     private cfg: Config,
+    private getStartupDiagnostic?: () => StartupDiagnostic,
   ) {
     this.sessions = new SessionManager(cfg.dataDir);
     this.log = new TurnLogger(cfg.dataDir);
@@ -90,28 +101,35 @@ export class Director {
   /** Preflight self-check: bridge reachable? active provider/model? worker key configured?
    *  The director should call this FIRST and guide the user per `note` if not ready. */
   async status() {
+    const startup = this.getStartupDiagnostic?.();
     try {
       const cfg = await this.bridge.config({ model: null, ensureConfirmOff: false });
       return {
+        mcpToolsRegistered: true,
         bridgeConnected: true,
         ready: !!cfg.hasKey,
         provider: cfg.provider,
         model: cfg.model,
         hasKey: cfg.hasKey,
         confirmTools: cfg.confirmTools,
+        startup,
         note: cfg.hasKey
           ? `就绪:浏览器已连、worker provider=${cfg.provider}、model=${cfg.model}。可以直接 agent_start。`
           : `浏览器连上了,但 provider "${cfg.provider}" 没配 API Key —— 请用户在 Firefox Reverse 的 Agent ⚙️ 设置里,给一个便宜 worker 模型(如 qwen-turbo / deepseek-v4-flash / glm)填好 Key。`,
       };
     } catch (e) {
+      const bridgeError = String((e as Error)?.message ?? e);
+      const startupDetail = startup?.error || startup?.note || "";
       return {
+        mcpToolsRegistered: true,
         bridgeConnected: false,
         ready: false,
-        error: String((e as Error)?.message ?? e),
+        startup,
+        error: startupDetail ? `${startupDetail}; bridge=${bridgeError}` : bridgeError,
         note:
-          "连不上浏览器的 marionette(127.0.0.1:2828)。请用户用 " +
-          '`open -n -a "/Applications/Firefox Reverse.app" --args -marionette -remote-allow-system-access -no-remote -profile "<你的 profile>"` ' +
-          "启动 Firefox Reverse；或设 FRX_AUTOLAUNCH=1+FRX_FIREFOX_BIN/FRX_PROFILE 让本 MCP 自动拉起。",
+          startup?.phase === "starting" || startup?.phase === "registered"
+            ? `MCP 工具已经注册，Firefox Reverse 仍在启动（Marionette 端口 ${startup.port}）；稍后重试 frx_status。`
+            : "MCP 工具已经注册，但浏览器 Marionette 尚不可达。请检查 FRX_FIREFOX_BIN、FRX_PROFILE / FRX_ENV_ID 和端口配置；修正后重启 MCP 或手动启动 Firefox Reverse。",
       };
     }
   }
@@ -377,6 +395,7 @@ export class Director {
       count: cat.count,
       tools: cat.tools,
       declaredNames: cat.declaredNames,
+      missingDeclared: cat.missingDeclared || [],
       note:
         "浏览器侧可用的逆向工具清单。默认走成本拆分(委派 worker:agent_start / agent_send);" +
         "0.2.0 起也可用 agent_call_tool 亲自直调其中任一工具(更快更准但花 director token)。" +

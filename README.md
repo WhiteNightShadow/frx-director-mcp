@@ -12,12 +12,12 @@
 
 </div>
 
-> **EN — TL;DR:** An MCP server bridging a high-capability model (Claude / GPT) to the [firefox-reverse](https://github.com/WhiteNightShadow/firefox-reverse) browser's built-in reverse-engineering engine. **Two composable modes:** (1) **Delegate** — the strong model *directs* while a cheap worker (DeepSeek / Qwen / GLM) *executes* all tooling (token cost-split); (2) **Direct-drive** — the strong model uses its *own* skill / experience library and calls the 44 engine tools itself via `agent_call_tool`. It can also list/create/open/import isolated fingerprint environments via `FRX_ENV_ID`. Never touches your API key (configured once in the browser).
+> **EN — TL;DR:** An MCP server bridging a high-capability model (Claude / GPT) to the [firefox-reverse](https://github.com/WhiteNightShadow/firefox-reverse) browser's built-in reverse-engineering engine. **Two composable modes:** (1) **Delegate** — the strong model *directs* while a cheap worker (DeepSeek / Qwen / GLM) *executes* all tooling (token cost-split); (2) **Direct-drive** — the strong model uses its *own* skill / experience library and calls the 66 browser tools itself via `agent_call_tool`. It can also list/create/open/import isolated fingerprint environments via `FRX_ENV_ID`. Never touches your API key (configured once in the browser).
 
 `frx-director-mcp` 是一个 MCP 服务，把**强模型**（Claude / GPT）通过标准 MCP 协议接到 [firefox-reverse](https://github.com/WhiteNightShadow/firefox-reverse) 浏览器内置的逆向引擎上。**两种可自由组合的模式：**
 
 - **模式一 · 领航委派（高模型配置、低模型调用）**：强模型当 director 只**下方向、审结论**；**便宜的 worker 模型**（DeepSeek-flash / Qwen-turbo / GLM）在浏览器里**执行全部工具**（抓包、签名追踪、补环境、脚本验证…）。token 天然拆分——强模型的判断力用在最高杠杆点，重复执行交给低成本模型；worker 复用浏览器内置的逆向方法论。
-- **模式二 · 经验库直驱（高模型带自建经验库、亲自调用）**：强模型用**自己的经验库 / 技能（skill）/ 方法论**，通过 `agent_call_tool` **亲自直调**浏览器的 44 个核心逆向工具（`signer_trace` / `jsvmp_trace` / `closure_read` / `page_eval` / 引擎级 hook…），跳过 worker。更快更准、可注入你自己的逆向经验；代价是每个工具回合花强模型的 token。
+- **模式二 · 经验库直驱（高模型带自建经验库、亲自调用）**：强模型用**自己的经验库 / 技能（skill）/ 方法论**，通过 `agent_call_tool` **亲自直调**浏览器的 66 个工具（`signer_trace` / `jsvmp_trace` / `closure_read` / `page_eval` / 环境管理 / Skills…），跳过 worker。更快更准、可注入你自己的逆向经验；代价是每个工具回合花强模型的 token。
 
 两种模式共用同一套桥接与浏览器引擎，**可按任务、按步自由切换**。0.3.0 起还可通过 MCP 管理 Firefox-Reverse 指纹环境（列表、新建、打开、关闭、导入采集 JSON），用 `FRX_ENV_ID` 启动指定独立 profile。0.3.2 起为 CLI 主模型补齐 `agent_poll` / `agent_read_brief`，避免 `agent_start` 后主模型停住不读结果。0.3.3 起修正三端自启动的 Marionette 端口传递方式。服务本身**零站点逻辑、不接触任何 API Key**（Key 仅在浏览器侧配置）。
 
@@ -40,7 +40,7 @@
 
 **模式一（默认，省钱主路）** 是结构性的成本拆分：强模型只在最高杠杆点介入，`assist`（AI 辅助阶段门）强制 worker 每阶段产出可审阅结论，让强模型尽早拦截错误路线。
 
-**模式二（0.2.0 起，opt-in 增益）** 把浏览器的 44 个核心工具直接暴露给强模型：先 `agent_tools` 看清能力与参数，再 `agent_call_tool` 亲自直调。强模型可带**自己的逆向经验库 / skill**（例如把一套方法论作为 system prompt），用引擎级工具（页面检测不到）一步步控制浏览器。
+**模式二（0.2.0 起，opt-in 增益）** 把浏览器的 66 个工具直接暴露给强模型：先 `agent_tools` 看清能力与参数，再 `agent_call_tool` 亲自直调。强模型可带**自己的逆向经验库 / skill**（例如把一套方法论作为 system prompt），用引擎级工具（页面检测不到）一步步控制浏览器。
 
 > 两者**不是二选一**：可以同一会话里简单步骤亲自 `agent_call_tool` 快跑、繁重重复步骤 `agent_start` 委派 worker。**唯一约束**：同一浏览器同一时刻只跑一种——`agent_call_tool` 在有 worker 会话运行时会被拒绝（与 agent 共享标签页 / hook / trace 状态，并发会串味），先 `agent_stop` / `agent_wait_for_stop` 再直调。
 
@@ -51,7 +51,7 @@
 ```
   强模型 director (Claude / GPT)                  firefox-reverse 浏览器
   ┌───────────────────────┐    MCP / stdio     ┌──────────────────────────────┐
-  │ ① agent_start  下目标  │ ─────────────────▶ │ worker 模型(便宜)执行 44 工具 │
+  │ ① agent_start  下目标  │ ─────────────────▶ │ worker 模型(便宜)执行 66 工具 │
   │ ② agent_poll 短轮询    │                    │ 抵达阶段门 → 产出阶段结论       │
   │ ③ agent_read_brief/read│ ◀───────────────── │                              │
   │ ④ agent_send   纠方向  │ ─────────────────▶ │ 按新方向继续                  │
@@ -65,7 +65,7 @@
 ```
   强模型 (Claude + 自建经验库/skill)              firefox-reverse 浏览器
   ┌───────────────────────┐    MCP / stdio     ┌──────────────────────────────┐
-  │ ① agent_tools 看能力   │ ─────────────────▶ │ 返回 44 工具的名/参数/说明     │
+  │ ① agent_tools 看能力   │ ─────────────────▶ │ 返回 66 工具的名/参数/说明     │
   │ ② agent_call_tool 直调 │ ─────────────────▶ │ 引擎级 dispatch → 工具信封     │
   │   (signer_trace/       │ ◀───────────────── │ (与内置 Agent 同一套引擎)     │
   │    page_eval/…)        │                    │                              │
@@ -171,6 +171,13 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 
 > 📂 **逆向产物在哪里？** 工作目录归属 firefox-reverse 项目、而非 MCP 工具自身。默认每个会话的目录是 **`<firefox-reverse 仓库旁>/firefox-reverse-ws/<会话id>/`**（从 `FRX_JSX_PROMPT_SRC` 推断仓库位置；推断不出则 `~/firefox-reverse-ws/<会话id>/`）—— 抓取的脚本、还原代码、`ledger.md` / `progress.md` 都落在这里，与你从哪个目录启动无关；`agent_start` / `agent_read` 的返回也会带上该会话的**具体路径**。要改位置，设 `FRX_WORKSPACE_ROOT` 即可。
 
+### 工具接入自检
+
+- 外部 AI/CLI 成功加载本 MCP 后，顶层可调用工具中应至少出现 `frx_status`、`agent_tools`、`agent_call_tool` 和 `frx_env_list`。
+- `notes_add`、`net_get`、`page_click`、`run_node`、`fs_*` 属于 Firefox Reverse 浏览器内核工具：先调用 `agent_tools` 查看目录，再通过 `agent_call_tool({ name, args })` 直调；它们不会全部展开成顶层 MCP 函数。
+- 如果本轮函数列表里只有 `open_url`，说明看到的是外部宿主自己的工具，本 MCP 尚未完成初始化；`open_url` 不属于 Firefox Reverse 或 frx-director-mcp。先查看 MCP stderr / 客户端日志，并确认 Node、MCP 命令和环境变量配置。
+- `v0.3.5` 起，MCP 会先完成 stdio 握手和工具注册，再等待 Windows 冷启动、环境 profile 和 Marionette 端口；即使浏览器启动失败，`frx_status` 仍会保留并返回具体启动诊断。
+
 ## 一键使用（两种模式）
 
 挑一种模式，**将对应整段原样复制**作为首条消息发给你的强模型；它会自动完成环境自检、引导你补齐配置、向你询问目标，并按该模式驱动逆向。
@@ -221,7 +228,7 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 【第 0 步 · 环境自检】先调用 frx_status。bridgeConnected=false → 引导用户用 -marionette 启动浏览器后重试。
   注意：直驱模式只用浏览器引擎工具、不需要 worker 模型的 Key（hasKey=false 也能直驱）。
 
-【第 1 步 · 看清能力】调用 agent_tools，记下 44 个工具的 name 与参数；重点是 16 个引擎级工具
+【第 1 步 · 看清能力】调用 agent_tools，记下 66 个工具的 name 与参数；重点关注引擎级 trace、页面、文件、Skills 与环境管理能力
   （signer_trace / jsvmp_trace / closure_read / webapi_trace / whitebox_diff / wasm_probe / crypto_scan 等，页面检测不到）。
 
 【第 2 步 · 明确目标】若用户未给，索取：① 站点 URL ② 接口 URL ③ 目标参数（签名/加密参数名）④ 输出目标（通常 Node 黑盒复刻、脱离浏览器请求成功）。
@@ -246,7 +253,7 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 | 工具 | 说明 |
 |---|---|
 | `frx_status` | **首先调用** —— 自检：Marionette 是否连通、当前 worker provider / model、Key 是否已配置；未就绪时返回引导说明 |
-| `agent_tools` | 列出浏览器侧 44 个工具清单（名称 / 说明 / 是否需确认 / 参数名），含 16 个**引擎级**逆向工具（`signer_trace` / `jsvmp_trace` / `closure_read` / `webapi_trace` / `whitebox_diff` / `wasm_probe`…，页面检测不到）。两种模式都用：委派时照它写 guidance，直驱时照它填 `agent_call_tool` 的参数 |
+| `agent_tools` | 列出浏览器侧 66 个工具清单（名称 / 说明 / 是否需确认 / 参数名），包含**引擎级**逆向工具（`signer_trace` / `jsvmp_trace` / `closure_read` / `webapi_trace` / `whitebox_diff` / `wasm_probe`…，页面检测不到），以及页面、文件、Skills、记忆和指纹环境管理能力。两种模式都用：委派时照它写 guidance，直驱时照它填 `agent_call_tool` 的参数 |
 
 **指纹环境管理**
 
@@ -280,6 +287,12 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 | `agent_call_tool` | **直驱核心动作** —— 强模型亲自直调一个浏览器引擎工具（跳过 worker）。先 `agent_tools` 查 `name`/参数，再 `agent_call_tool({name, args})`。返回工具信封（`ok`/`data`/`error`，永不抛、已校验未知工具与缺参）。⚠ 有 worker 会话运行时被拒绝（共享页面 / hook 状态）；需 firefox-reverse **v0.20.0+** |
 
 ## 📝 版本更新记录
+
+### v0.3.5（2026-08-20）
+- **Windows 冷启动工具注册修复**：MCP stdio 握手和固定工具注册提前到 Firefox 自动拉起 / Marionette 端口等待之前，避免浏览器启动几十秒时被外部 CLI 判定 MCP 启动超时、最终只剩宿主自带的 `open_url`。
+- **浏览器工具目录补全**：`agent_tools` 改为读取浏览器实际 backend 注册表，修复旧静态 stub 只返回 38/66 个工具的问题；新增 `missingDeclared` 一致性诊断。
+- **失败保持可诊断**：`FRX_FIREFOX_BIN`、`FRX_ENV_ID` 或浏览器启动配置错误不再直接退出 MCP；`frx_status` 返回 `mcpToolsRegistered` 与 `startup.phase/error`，用户修正浏览器配置后可明确复查。
+- **进程级回归测试**：真实启动 MCP stdio 子进程，在故意破坏 Firefox autolaunch 的情况下验证 `initialize` / `tools/list` 仍成功，且包含 `frx_status`、`agent_tools`、`agent_call_tool`、不包含外部宿主的 `open_url`。
 
 ### v0.3.4（2026-07-29）
 - **Firefox-only 环境创建**：`frx_env_create` 不再接受浏览器内核类型，新环境始终使用与 Firefox Reverse 内核一致的 Firefox 指纹。

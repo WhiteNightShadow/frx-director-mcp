@@ -39,6 +39,8 @@ export interface ToolCatalog {
   tools: ToolInfo[];
   /** All declared tool names regardless of which backends are wired (fallback list). */
   declaredNames: string[];
+  /** Declared names absent from the live registry; non-empty means browser packaging/backend wiring is incomplete. */
+  missingDeclared?: string[];
   count: number;
 }
 
