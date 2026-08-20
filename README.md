@@ -176,7 +176,7 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 - 外部 AI/CLI 成功加载本 MCP 后，顶层可调用工具中应至少出现 `frx_status`、`agent_tools`、`agent_call_tool` 和 `frx_env_list`。
 - `notes_add`、`net_get`、`page_click`、`run_node`、`fs_*` 属于 Firefox Reverse 浏览器内核工具：先调用 `agent_tools` 查看目录，再通过 `agent_call_tool({ name, args })` 直调；它们不会全部展开成顶层 MCP 函数。
 - 如果本轮函数列表里只有 `open_url`，说明看到的是外部宿主自己的工具，本 MCP 尚未完成初始化；`open_url` 不属于 Firefox Reverse 或 frx-director-mcp。先查看 MCP stderr / 客户端日志，并确认 Node、MCP 命令和环境变量配置。
-- `v0.3.5` 起，MCP 会先完成 stdio 握手和工具注册，再等待 Windows 冷启动、环境 profile 和 Marionette 端口；即使浏览器启动失败，`frx_status` 仍会保留并返回具体启动诊断。
+- `v0.3.6` 起，MCP 会先完成 stdio 握手和工具注册，再解析 `FRX_ENV_ID`、分配端口、等待 Windows 冷启动与 Marionette；即使环境配置或浏览器启动失败，`frx_status` 仍会保留并返回具体诊断。
 
 ## 一键使用（两种模式）
 
@@ -287,6 +287,12 @@ claude mcp add frx-director -- node <安装路径>/frx-director-mcp/dist/index.j
 | `agent_call_tool` | **直驱核心动作** —— 强模型亲自直调一个浏览器引擎工具（跳过 worker）。先 `agent_tools` 查 `name`/参数，再 `agent_call_tool({name, args})`。返回工具信封（`ok`/`data`/`error`，永不抛、已校验未知工具与缺参）。⚠ 有 worker 会话运行时被拒绝（共享页面 / hook 状态）；需 firefox-reverse **v0.20.0+** |
 
 ## 📝 版本更新记录
+
+### v0.3.6（2026-08-20）
+- **环境解析也不再阻塞注册**：新增延迟浏览器桥，`FRX_ENV_ID` 读取、环境端口分配和真实 Bridge 创建全部移到 MCP `initialize/tools/list` 之后；彻底消除环境目录或端口探测拖慢外部宿主握手的剩余竞态。
+- **未就绪调用快速失败**：浏览器桥尚在解析时，工具调用立即返回 `startup.phase=resolving/starting`，不会把单次 MCP 请求挂在几十秒冷启动后面。
+- **历史结论**：启动握手阻塞从 MCP 初版就存在，旧静态 `agent_tools` 在首次引入时也只返回 36/44 个有说明工具；v0.23 的独立 profile 冷启动与 66 工具扩容只是让旧问题更容易显现，并非 Firefox v0.23 新删了工具。
+- **回归扩展**：新增延迟桥单测及 `FRX_ENV_ID` 解析失败进程级测试，并继续要求 Windows / Ubuntu 双平台 CI。
 
 ### v0.3.5（2026-08-20）
 - **Windows 冷启动工具注册修复**：MCP stdio 握手和固定工具注册提前到 Firefox 自动拉起 / Marionette 端口等待之前，避免浏览器启动几十秒时被外部 CLI 判定 MCP 启动超时、最终只剩宿主自带的 `open_url`。

@@ -127,8 +127,8 @@ export class Director {
         startup,
         error: startupDetail ? `${startupDetail}; bridge=${bridgeError}` : bridgeError,
         note:
-          startup?.phase === "starting" || startup?.phase === "registered"
-            ? `MCP 工具已经注册，Firefox Reverse 仍在启动（Marionette 端口 ${startup.port}）；稍后重试 frx_status。`
+          startup?.phase === "resolving" || startup?.phase === "starting" || startup?.phase === "registered"
+            ? `MCP 工具已经注册，浏览器环境仍在解析或启动（Marionette 端口 ${startup.port}）；稍后重试 frx_status。`
             : "MCP 工具已经注册，但浏览器 Marionette 尚不可达。请检查 FRX_FIREFOX_BIN、FRX_PROFILE / FRX_ENV_ID 和端口配置；修正后重启 MCP 或手动启动 Firefox Reverse。",
       };
     }
