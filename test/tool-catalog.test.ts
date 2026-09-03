@@ -9,6 +9,8 @@ type ToolSpec = {
 };
 
 const declarations = [
+  ["addons_query", "addons", "query"],
+  ["addons_manage", "addons", "manage"],
   ["page_click", "page", "click"],
   ["net_get", "net", "get"],
   ["run_node", "workspace", "runNode"],
@@ -57,8 +59,12 @@ function executeCatalog(opts: { liveBackends?: Record<string, Record<string, unk
 
 describe("browser tool catalog payload", () => {
   it("uses the live backend registry when available", () => {
-    const liveBackends = Object.fromEntries(
-      declarations.map(([, backend, method]) => [backend, { [method]: () => undefined }]),
+    const liveBackends = declarations.reduce<Record<string, Record<string, unknown>>>(
+      (backends, [, backend, method]) => {
+        (backends[backend] ||= {})[method] = () => undefined;
+        return backends;
+      },
+      {},
     );
     const result = executeCatalog({ liveBackends });
     expect(result.count).toBe(declarations.length);

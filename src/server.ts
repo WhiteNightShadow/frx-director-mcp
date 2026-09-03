@@ -411,7 +411,8 @@ export function registerTools(server: McpServer, director: Director): void {
     {
       title: "List the browser-side tools",
       description:
-        "列出浏览器侧可用的逆向工具清单(名称/说明/是否需确认/参数名)——含 16 个引擎级逆向工具(signer_trace/jsvmp_trace/closure_read/webapi_trace/whitebox_diff/wasm_probe 等,页面检测不到)。" +
+        "列出浏览器侧实际可用的工具清单(名称/说明/是否需确认/参数名)。Firefox Reverse v0.24.0 提供 68 个工具，" +
+        "包含引擎级逆向工具(signer_trace/jsvmp_trace/closure_read/webapi_trace/whitebox_diff/wasm_probe 等)、环境管理以及 Firefox 扩展查询/管理(addons_query/addons_manage)。" +
         "默认走成本拆分(把工具名写进 guidance、委派 worker 执行);0.2.0 起也可用 agent_call_tool 亲自直调。只读、无副作用,先看这个再决定委派还是直调。",
       inputSchema: {},
     },
@@ -434,7 +435,7 @@ export function registerTools(server: McpServer, director: Director): void {
         "返回工具信封(ok/data/error);浏览器侧 dispatch 永不抛、已校验未知工具与缺参。" +
         "⚠ 任一会话(agent_start 起的)正在跑时会被拒绝:raw 直调与运行中的 agent 共享同一标签页/hook/trace 状态,并发会串味——先 agent_stop/agent_wait_for_stop 再直调。需浏览器 v0.20.0+。",
       inputSchema: {
-        name: z.string().describe("工具名(来自 agent_tools),如 code_search / signer_trace / page_eval / jsvmp_trace"),
+        name: z.string().describe("工具名(来自 agent_tools),如 code_search / signer_trace / page_eval / addons_query / addons_manage"),
         args: z.record(z.unknown()).optional().describe("该工具的参数对象(按 agent_tools 给的 params 填);省略=空对象"),
         workspaceRoot: z.string().optional().describe("本次调用的工作目录绝对路径(影响 fs_*/run_node/trace 落盘);省略=引擎默认"),
       },
