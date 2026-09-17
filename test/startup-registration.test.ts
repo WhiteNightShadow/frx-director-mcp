@@ -1,11 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createServer } from "node:net";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 type RpcMessage = {
   id?: number;
   result?: {
+    serverInfo?: { name?: string; version?: string };
     tools?: Array<{ name?: string }>;
     content?: Array<{ type?: string; text?: string }>;
   };
@@ -118,6 +120,10 @@ async function exerciseStartupFailure(
     );
     const initialized = await waitFor(1);
     expect(initialized.error).toBeUndefined();
+    expect(initialized.result?.serverInfo).toEqual({
+      name: "frx-director-mcp",
+      version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
+    });
 
     child.stdin.write(
       JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }) + "\n",

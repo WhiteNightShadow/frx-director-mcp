@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { readFileSync } from "node:fs";
 import { config } from "./config.js";
 import { MarionetteBridge } from "./bridge/MarionetteBridge.js";
 import { FileBridge } from "./bridge/FileBridge.js";
@@ -113,7 +114,8 @@ async function main(): Promise<void> {
   };
 
   const director = new Director(bridge, config, () => ({ ...startup }));
-  const server = new McpServer({ name: "frx-director-mcp", version: "0.3.6" });
+  const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const server = new McpServer({ name: "frx-director-mcp", version });
   registerTools(server, director);
 
   // No environment I/O, port probing or browser launch may precede this line.
