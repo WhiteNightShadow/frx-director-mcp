@@ -2,13 +2,23 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildFirefoxArgs, buildLaunchCommand, resolveBrowserLaunch } from "../src/launcher.js";
+import { buildFirefoxArgs, buildLaunchCommand, mergeLaunchEnvironment, resolveBrowserLaunch } from "../src/launcher.js";
 
 function writeJSON(path: string, data: unknown): void {
   writeFileSync(path, JSON.stringify(data, null, 2));
 }
 
 describe("launcher environment resolution", () => {
+  it("keeps file-only launches free of inherited inline fingerprints and parent tokens", () => {
+    const inherited = { PATH: "keep", MOZ_FRX_FINGERPRINT_JSON: '{"enabled":true}', MOZ_FRX_PARENT_CONFIG_TOKEN: "old" };
+    const fileOnly = mergeLaunchEnvironment(inherited, { MOZ_FRX_FINGERPRINT_CONFIG: "C:\\用户\\fingerprint.json" });
+    expect(fileOnly.PATH).toBe("keep");
+    expect(fileOnly).not.toHaveProperty("MOZ_FRX_FINGERPRINT_JSON");
+    expect(fileOnly).not.toHaveProperty("MOZ_FRX_PARENT_CONFIG_TOKEN");
+    expect(inherited.MOZ_FRX_PARENT_CONFIG_TOKEN).toBe("old");
+    const empty = mergeLaunchEnvironment(inherited, { MOZ_FRX_FINGERPRINT_CONFIG: "/owned/file", MOZ_FRX_FINGERPRINT_JSON: "" });
+    expect(empty.MOZ_FRX_FINGERPRINT_JSON).toBe("");
+  });
   it("uses LaunchServices for macOS app bundles", () => {
     const args = buildFirefoxArgs(2828, "/Users/me/Profile");
     const command = buildLaunchCommand({
@@ -25,6 +35,13 @@ describe("launcher environment resolution", () => {
     expect(command.args).toContain("-marionette");
     expect(command.args).toContain("-profile");
     expect(command.args).toContain("/Users/me/Profile");
+    const unicode = buildLaunchCommand({ firefoxBin: "/Applications/Firefox Reverse.app", args, platform: "darwin", environment: { MOZ_FRX_FINGERPRINT_CONFIG: "/Users/用户/环境.json", MOZ_FRX_ENV_NAME: "中文环境", MOZ_FRX_PROXY_JSON: '{"password":"秘密"}' } });
+    expect(unicode.args).toContain("--env");
+    expect(unicode.args).toContain("MOZ_FRX_FINGERPRINT_CONFIG=/Users/用户/环境.json");
+    expect(unicode.args).toContain("MOZ_FRX_ENV_NAME=中文环境");
+    expect(unicode.displayCommand).not.toContain("password");
+    expect(unicode.displayCommand).not.toContain("秘密");
+    expect(unicode.args.indexOf("--env")).toBeLessThan(unicode.args.indexOf("--args"));
   });
 
   it("keeps direct executable launch on non-macOS platforms", () => {
@@ -108,5 +125,11 @@ describe("launcher environment resolution", () => {
     const saved = JSON.parse(readFileSync(join(envDir, "env.json"), "utf8"));
     expect(saved.runtime.status).toBe("stopped");
     expect(saved.runtime.marionettePort).toBe(launch.port);
+    writeJSON(join(envDir, "fingerprint.json"), { enabled: true, consistency: { mode: "native-consistent", version: 1 }, padding: "x".repeat(40000) });
+    const native = await resolveBrowserLaunch({ host: "127.0.0.1", port: basePort, profile: "", envId, envsRoot: root });
+    expect(native.extraEnv).not.toHaveProperty("MOZ_FRX_FINGERPRINT_JSON");
+    expect(native.extraEnv.MOZ_FRX_FINGERPRINT_CONFIG).toBe(join(envDir, "fingerprint.json"));
+    expect(readFileSync(join(envDir, "profile/user.js"), "utf8")).toContain('user_pref("frx.fingerprint.config.json", "");');
+    expect(readFileSync(join(envDir, "profile/user.js"), "utf8")).not.toContain("x".repeat(40000));
   });
 });

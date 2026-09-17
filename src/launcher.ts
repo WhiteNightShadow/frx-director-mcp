@@ -203,6 +203,15 @@ function automationFingerprintEnv(extraEnv: Record<string, string> = {}): Record
   return { MOZ_FRX_FINGERPRINT_JSON: MINIMAL_AUTOMATION_FINGERPRINT };
 }
 
+export function mergeLaunchEnvironment(inherited: NodeJS.ProcessEnv, explicit: Record<string, string>): NodeJS.ProcessEnv {
+  const environment = { ...inherited, ...explicit };
+  if (Object.hasOwn(explicit, "MOZ_FRX_FINGERPRINT_CONFIG") && !Object.hasOwn(explicit, "MOZ_FRX_FINGERPRINT_JSON")) {
+    delete environment.MOZ_FRX_FINGERPRINT_JSON;
+  }
+  delete environment.MOZ_FRX_PARENT_CONFIG_TOKEN;
+  return environment;
+}
+
 function shellQuote(s: string): string {
   return /\s|["'\\$`]/.test(s) ? JSON.stringify(s) : s;
 }
@@ -223,12 +232,18 @@ export function buildLaunchCommand(opts: {
   args: string[];
   platform?: NodeJS.Platform;
   processLabel?: string;
+  environment?: NodeJS.ProcessEnv;
 }): LaunchCommand {
   const platform = opts.platform || process.platform;
   if (platform === "darwin") {
     const appPath = macOSAppPath(opts.firefoxBin);
     if (appPath) {
-      const args = ["-n", "-a", appPath, "--args", ...opts.args];
+      // open's inherited environment can reinterpret UTF-8 bytes as Latin-1.
+      // Explicit --env arguments preserve Unicode paths and environment labels.
+      // Keep JSON payloads (which may contain secrets) out of argv entirely.
+      const pathKeys = new Set(["HOME", "PATH", "TMPDIR", "MOZ_FRX_FINGERPRINT_CONFIG", "MOZ_FRX_PROXY_CONFIG", "MOZ_FRX_ENVS_ROOT", "MOZ_FRX_TRACE_DIR", "MOZ_FRX_CONTROL_DIR", "MOZ_FRX_ENV_NAME", "MOZ_FRX_PROCESS_LABEL", "FRX_ENV_NAME", "FRX_ENVS_ROOT", "MOZ_WEBAPI_TRACE_FILE", "MOZ_WEBAPI_TRACE_CTL", "MOZ_JSVMP_TRACE_FILE"]);
+      const unicodeEnvironment = Object.entries(opts.environment || {}).flatMap(([key, value]) => pathKeys.has(key) && typeof value === "string" && /[^\x00-\x7f]/.test(value) ? ["--env", `${key}=${value}`] : []);
+      const args = ["-n", "-a", appPath, ...unicodeEnvironment, "--args", ...opts.args];
       return {
         command: "open",
         args,
@@ -423,6 +438,7 @@ export async function resolveBrowserLaunch(opts: {
   const fingerprintPath = envString(env, "fingerprintPath", join(envDir, "fingerprint.json"));
   const proxyPath = envString(env, "proxyPath", join(envDir, "proxy.json"));
   const fingerprintJson = readOptionalJSONText(fingerprintPath);
+  const nativeFileOnly = !!fingerprintJson && JSON.parse(fingerprintJson)?.consistency?.mode === "native-consistent";
   const envName = envString(env, "name", opts.envId);
   const rt = envRuntime(env);
   const preferred = Number(rt.marionettePort);
@@ -452,7 +468,7 @@ export async function resolveBrowserLaunch(opts: {
     "frx.environment.name": envName,
     "frx.process.label": processLabel,
     "frx.fingerprint.config.path": fingerprintPath,
-    ...(fingerprintJson ? { "frx.fingerprint.config.json": fingerprintJson } : {}),
+    ...(fingerprintJson ? { "frx.fingerprint.config.json": nativeFileOnly ? "" : fingerprintJson } : {}),
     "frx.proxy.config.path": proxyPath,
   });
   return {
@@ -469,7 +485,7 @@ export async function resolveBrowserLaunch(opts: {
       MOZ_FRX_PROCESS_LABEL: processLabel,
       MOZ_FRX_ENVS_ROOT: opts.envsRoot,
       MOZ_FRX_FINGERPRINT_CONFIG: fingerprintPath,
-      ...(fingerprintJson ? { MOZ_FRX_FINGERPRINT_JSON: fingerprintJson } : {}),
+      ...(fingerprintJson && !nativeFileOnly ? { MOZ_FRX_FINGERPRINT_JSON: fingerprintJson } : {}),
       MOZ_FRX_PROXY_CONFIG: proxyPath,
       MOZ_FRX_TRACE_DIR: traceDir,
       MOZ_FRX_CONTROL_DIR: controlDir,
@@ -534,24 +550,30 @@ export async function ensureBrowser(opts: {
     } : {}),
   });
   const extraEnv = opts.extraEnv || {};
+  const environment = mergeLaunchEnvironment({
+    ...process.env,
+    MOZ_FRX_HIDE_REMOTE_CONTROL_CUE: "1",
+    MOZ_MARIONETTE: "1",
+    MOZ_MARIONETTE_PREF_STATE_ACROSS_RESTARTS: JSON.stringify({ "marionette.port": opts.port }),
+    ...automationFingerprintEnv(extraEnv),
+  }, extraEnv);
   const command = buildLaunchCommand({
     firefoxBin: opts.firefoxBin,
     args,
     platform,
     processLabel: opts.launch?.processLabel || undefined,
+    environment,
   });
+  if (command.method === "macos-open") {
+    for (const key of ["MOZ_FRX_FINGERPRINT_JSON", "MOZ_FRX_PROXY_JSON"]) {
+      if (environment[key]) environment[key] = environment[key].replace(/[^\x00-\x7f]/g, ch => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
+    }
+  }
   const child = spawn(command.command, command.args, {
     detached: true,
     stdio: ["ignore", "ignore", "pipe"],
     argv0: command.argv0,
-    env: {
-      ...process.env,
-      MOZ_FRX_HIDE_REMOTE_CONTROL_CUE: "1",
-      MOZ_MARIONETTE: "1",
-      MOZ_MARIONETTE_PREF_STATE_ACROSS_RESTARTS: JSON.stringify({ "marionette.port": opts.port }),
-      ...automationFingerprintEnv(extraEnv),
-      ...extraEnv,
-    },
+    env: environment,
   });
   const observer = observeChild(child);
   updateEnvRuntime(opts.launch || {

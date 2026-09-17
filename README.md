@@ -301,6 +301,12 @@ agent_call_tool({name:"addons_manage", args:{action:"open_options", id:"扩展 G
 
 ## 📝 版本更新记录
 
+### v0.3.8（候选验证，2026-09-17）
+- `frx_env_create` 增加可选 `consistencyMode`，转交支持原生一致策略的新版 Firefox Reverse；不传时仍使用浏览器自身默认值，不强制迁移历史环境。
+- 工具说明明确：原生一致策略不随机 Screen/DPR/GPU；工具数和 Agent 委派流程不变。
+- 原生一致环境以文件传配置，清除继承的旧 inline 指纹与父 token，避免 Windows 环境块容量限制；历史配置保留 inline 路径，显式传入的 inline（包括空字符串）不被悄悄替换。
+- 修复 macOS LaunchServices 启动时继承环境变量造成的中文路径乱码：路径/标签通过 `open --env` 传递，JSON 使用等价 ASCII 转义且不进入进程参数。已在本机验证中文配置路径可读。
+
 ### v0.3.7（2026-09-03）
 - **68 个浏览器工具说明同步**：README 与 `agent_tools` 描述同步 Firefox Reverse v0.24.0，明确 23 个顶层 MCP 编排工具和 68 个浏览器工具的边界。
 - **扩展管理直驱说明**：补充 `addons_query` / `addons_manage` 的搜索、列表、签名安装和配置页示例，以及确认与系统扩展保护边界。

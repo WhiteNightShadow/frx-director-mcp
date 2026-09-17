@@ -75,10 +75,11 @@ export function registerTools(server: McpServer, director: Director): void {
     "frx_env_create",
     {
       title: "Create a Firefox Reverse environment",
-      description: "一键新建 Firefox 环境；内核版本和系统跟随 Firefox Reverse，默认中国大陆简体中文。",
+      description: "一键新建 Firefox 环境；新版内核默认原生一致策略，保持真实 Screen/DPR/GPU，默认中国大陆简体中文。旧版浏览器仍按自身默认策略执行。",
       inputSchema: {
         name: z.string().optional().describe("环境名称"),
-        randomize: z.boolean().optional().describe("默认 true，只随机分辨率、DPR 和 CPU 核数等非身份参数"),
+        randomize: z.boolean().optional().describe("历史策略可随机分辨率、DPR 和 CPU；原生一致策略不随机硬件值"),
+        consistencyMode: z.enum(["native-consistent", "legacy"]).optional().describe("需支持原生一致策略的新版 Firefox Reverse；不传使用浏览器默认策略"),
         language: z.string().optional().describe("首选语言，如 zh-CN"),
         languages: z.array(z.string()).optional().describe("语言列表，如 [zh-CN, zh, en-US, en]"),
         locale: z.string().optional().describe("地区标识，如 zh-CN"),
@@ -89,6 +90,7 @@ export function registerTools(server: McpServer, director: Director): void {
       callEnvTool("env_create", {
         name: a.name,
         generateOptions: {
+          ...(a.consistencyMode ? { consistencyMode: a.consistencyMode } : {}),
           randomize: a.randomize !== false,
           language: a.language,
           languages: a.languages,

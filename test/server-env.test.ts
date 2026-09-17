@@ -39,5 +39,10 @@ describe("Firefox environment tools", () => {
       },
     });
     expect(JSON.stringify(callTool.mock.calls)).not.toContain("chromium");
+    expect(callTool.mock.calls[0][0].args.generateOptions).not.toHaveProperty("consistencyMode");
+    await create?.({ name: "native", consistencyMode: "native-consistent" });
+    expect(callTool).toHaveBeenLastCalledWith(expect.objectContaining({ args: expect.objectContaining({ generateOptions: expect.objectContaining({ consistencyMode: "native-consistent" }) }) }));
+    await create?.({ name: "legacy", consistencyMode: "legacy" });
+    expect(callTool).toHaveBeenLastCalledWith(expect.objectContaining({ args: expect.objectContaining({ generateOptions: expect.objectContaining({ consistencyMode: "legacy" }) }) }));
   });
 });
