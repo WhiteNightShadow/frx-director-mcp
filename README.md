@@ -320,6 +320,7 @@ agent_call_tool({name:"addons_manage", args:{action:"open_options", id:"扩展 G
 - **按需目录**：`agent_tools` 支持 prefix/query/compact/limit，完整查询兼容旧行为；实际浏览器工具数动态读取，Firefox Reverse v0.26.0 增至 71。
 - **独立实例启动**：补充当前 Firefox 基线有效的 `-new-instance`，保留旧参数兼容，不绕过 profile 锁、不全量终止浏览器进程。
 - **验证**：33 项本地测试通过，含真实 MCP SDK 注册/调用、stdio 冷启动失败时三种目录仍可用，以及已有委派循环与启动路径回归；不强制底层执行 start/wait/read 流程。
+- **依赖维护**：锁定依赖更新到兼容的 SDK 1.32.1，约束 Hono Node adapter 保留 1.x 的 Node 18 兼容；Node 18.20.8/24 均通过 33 项测试，发布时 `npm audit --omit=dev` 为 0。开发测试依赖仍有 9 项既有告警，本轮未强制升级开发工具大版本；预构建发行包只需 `npm ci --omit=dev`。当前服务是 stdio，不启用 SDK HTTP/OAuth 路径，[SDK 公告](https://github.com/advisories/GHSA-6qxp-vccf-f47h)说明该 OAuth 问题不影响 stdio 服务端。
 
 ### v0.3.8（2026-09-17）
 - `frx_env_create` 增加可选 `consistencyMode`，转交支持原生一致策略的新版 Firefox Reverse；不传时仍使用浏览器自身默认值，不强制迁移历史环境。
