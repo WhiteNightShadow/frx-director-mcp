@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseToolProfile, profileToolNames } from "../src/toolProfiles.js";
 
 type RpcMessage = {
   id?: number;
@@ -59,6 +60,7 @@ async function exerciseStartupFailure(
     FRX_MARIONETTE_HOST: "127.0.0.1",
     FRX_MARIONETTE_PORT: String(port),
     FRX_PORT_WAIT_SEC: "0",
+    FRX_TOOL_PROFILE: "all",
     ...overrides,
   };
   const child = spawn(process.execPath, [join(process.cwd(), "dist", "index.js")], {
@@ -133,7 +135,7 @@ async function exerciseStartupFailure(
     const names = listed.result?.tools?.map((tool) => tool.name) || [];
     expect(names).toContain("frx_status");
     expect(names).toContain("agent_tools");
-    expect(names).toContain("agent_call_tool");
+    expect(names.sort()).toEqual([...profileToolNames(parseToolProfile(env.FRX_TOOL_PROFILE))].sort());
     expect(names).not.toContain("open_url");
     expect(child.exitCode).toBeNull();
 
@@ -167,6 +169,11 @@ async function exerciseStartupFailure(
 }
 
 describe("MCP startup registration", () => {
+  for (const profile of ["direct", "delegate"]) {
+    it(`registers the ${profile} group before a broken browser launch`, async () => {
+      await exerciseStartupFailure({ FRX_TOOL_PROFILE: profile }, "FRX_FIREFOX_BIN is unset");
+    }, 10_000);
+  }
   it("registers tools before a broken Firefox autolaunch can terminate startup", async () => {
     await exerciseStartupFailure({}, "FRX_FIREFOX_BIN is unset");
   }, 10_000);

@@ -116,7 +116,7 @@ async function main(): Promise<void> {
   const director = new Director(bridge, config, () => ({ ...startup }));
   const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const server = new McpServer({ name: "frx-director-mcp", version });
-  registerTools(server, director);
+  registerTools(server, director, config.toolProfile);
 
   // No environment I/O, port probing or browser launch may precede this line.
   // External hosts can complete initialize/tools-list immediately on every OS.

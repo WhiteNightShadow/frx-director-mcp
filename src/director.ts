@@ -6,6 +6,7 @@ import { TurnLogger } from "./logging.js";
 import { waitForStop, type WaitResult } from "./settle.js";
 import { buildSystemPrompt } from "./prompt.js";
 import type { Config } from "./config.js";
+import { profileToolNames } from "./toolProfiles.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -102,18 +103,25 @@ export class Director {
    *  The director should call this FIRST and guide the user per `note` if not ready. */
   async status() {
     const startup = this.getStartupDiagnostic?.();
+    const toolProfile = this.cfg.toolProfile || "all";
+    const toolSelection = { toolProfile, exposedTools: profileToolNames(toolProfile) };
     try {
       const cfg = await this.bridge.config({ model: null, ensureConfirmOff: false });
       return {
+        ...toolSelection,
         mcpToolsRegistered: true,
         bridgeConnected: true,
-        ready: !!cfg.hasKey,
+        ready: toolProfile === "direct" || !!cfg.hasKey,
+        directReady: true,
+        delegateReady: !!cfg.hasKey,
         provider: cfg.provider,
         model: cfg.model,
         hasKey: cfg.hasKey,
         confirmTools: cfg.confirmTools,
         startup,
-        note: cfg.hasKey
+        note: toolProfile === "direct"
+          ? "直接调用模式就绪：agent_tools 按需查询目录，agent_call_tool 执行浏览器工具，无需 worker API Key。"
+          : cfg.hasKey
           ? `就绪:浏览器已连、worker provider=${cfg.provider}、model=${cfg.model}。可以直接 agent_start。`
           : `浏览器连上了,但 provider "${cfg.provider}" 没配 API Key —— 请用户在 Firefox Reverse 的 Agent ⚙️ 设置里,给一个便宜 worker 模型(如 qwen-turbo / deepseek-v4-flash / glm)填好 Key。`,
       };
@@ -121,9 +129,12 @@ export class Director {
       const bridgeError = String((e as Error)?.message ?? e);
       const startupDetail = startup?.error || startup?.note || "";
       return {
+        ...toolSelection,
         mcpToolsRegistered: true,
         bridgeConnected: false,
         ready: false,
+        directReady: false,
+        delegateReady: false,
         startup,
         error: startupDetail ? `${startupDetail}; bridge=${bridgeError}` : bridgeError,
         note:
@@ -386,20 +397,24 @@ export class Director {
     return { entries: entries.slice(-20), raw: !args.tid };
   }
 
-  /** Read-only: the browser-side tool catalog the worker can use. Surfaced so the
-   *  director can write more precise guidance — NOT so it can call tools itself
-   *  (the cost-split keeps execution on the worker via agent_start/agent_send). */
-  async tools() {
+  /** Read-only catalog for delegation guidance or direct-drive tool arguments. */
+  async tools(options: { prefix?: string; query?: string; compact?: boolean; limit?: number } = {}) {
     const cat = await this.bridge.listTools();
+    const matches = (tool: { name: string; description?: string }) =>
+      (!options.prefix || tool.name.startsWith(options.prefix)) &&
+      (!options.query || `${tool.name} ${tool.description || ""}`.toLowerCase().includes(options.query.toLowerCase()));
+    const filtered = cat.tools.filter(matches);
+    const selected = filtered.slice(0, options.limit ?? filtered.length);
+    const narrowed = !!(options.prefix || options.query || options.limit !== undefined || options.compact);
     return {
-      count: cat.count,
-      tools: cat.tools,
-      declaredNames: cat.declaredNames,
+      count: narrowed ? selected.length : cat.count,
+      tools: options.compact ? selected.map(({ name, params, needsConfirm }) => ({ name, params, needsConfirm })) : selected,
+      declaredNames: narrowed ? selected.map(tool => tool.name) : cat.declaredNames,
       missingDeclared: cat.missingDeclared || [],
+      ...(narrowed ? { totalAvailable: cat.count, totalMatches: filtered.length, truncated: selected.length < filtered.length } : {}),
       note:
-        "浏览器侧可用的逆向工具清单。默认走成本拆分(委派 worker:agent_start / agent_send);" +
-        "0.2.0 起也可用 agent_call_tool 亲自直调其中任一工具(更快更准但花 director token)。" +
-        "先看此清单的 name 和 params,再决定委派还是直调。",
+        (this.cfg.toolProfile === "direct" ? "直驱模式：用 agent_call_tool 执行浏览器工具。" : this.cfg.toolProfile === "delegate" ? "委派模式：本目录用于编写 worker guidance，不提供 agent_call_tool。" : "浏览器工具目录：可用 agent_start/agent_send 委派，或 agent_call_tool 直驱。") +
+        "先看此清单的 name 和 params；prefix/query 可筛选，compact 可省略说明。是否能执行取决于当前工具分组。",
     };
   }
 

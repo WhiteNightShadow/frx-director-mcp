@@ -222,7 +222,7 @@ function macOSAppPath(firefoxBin: string): string {
 }
 
 export function buildFirefoxArgs(_port: number, profile: string): string[] {
-  const args = ["-marionette", "-remote-allow-system-access", "-no-remote"];
+  const args = ["-marionette", "-remote-allow-system-access", "-no-remote", "-new-instance"];
   if (profile) args.push("-profile", profile);
   return args;
 }

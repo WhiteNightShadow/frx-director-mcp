@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Director } from "./director.js";
+import { profileToolNames, type ToolProfile } from "./toolProfiles.js";
 
 const ok = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
@@ -20,8 +21,9 @@ const err = (e: unknown) => ({
  *     director tokens per round. Refused while a worker session runs (shared page/
  *     hook state). Existing delegate flows are unchanged whether or not it's used.
  */
-export function registerTools(server: McpServer, director: Director): void {
-  server.registerTool(
+export function registerTools(server: McpServer, director: Director, profile: ToolProfile = "all"): void {
+  const enabled = new Set(profileToolNames(profile));
+  if (enabled.has("frx_status")) server.registerTool(
     "frx_status",
     {
       title: "Preflight: check setup before starting",
@@ -47,7 +49,7 @@ export function registerTools(server: McpServer, director: Director): void {
     }
   };
 
-  server.registerTool(
+  if (enabled.has("frx_env_current")) server.registerTool(
     "frx_env_current",
     {
       title: "Get current Firefox Reverse environment",
@@ -59,7 +61,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_current", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_list")) server.registerTool(
     "frx_env_list",
     {
       title: "List Firefox Reverse environments",
@@ -71,7 +73,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_list", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_create")) server.registerTool(
     "frx_env_create",
     {
       title: "Create a Firefox Reverse environment",
@@ -100,7 +102,7 @@ export function registerTools(server: McpServer, director: Director): void {
       }),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_rename")) server.registerTool(
     "frx_env_rename",
     {
       title: "Rename a Firefox Reverse environment",
@@ -113,7 +115,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_update", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_open")) server.registerTool(
     "frx_env_open",
     {
       title: "Open a Firefox Reverse environment",
@@ -125,7 +127,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_open", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_close")) server.registerTool(
     "frx_env_close",
     {
       title: "Close a Firefox Reverse environment",
@@ -137,7 +139,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_close", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_delete")) server.registerTool(
     "frx_env_delete",
     {
       title: "Delete a Firefox Reverse environment",
@@ -150,7 +152,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_delete", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_import_json")) server.registerTool(
     "frx_env_import_json",
     {
       title: "Import a full Firefox Reverse environment JSON",
@@ -167,7 +169,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_import", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_env_import_capture")) server.registerTool(
     "frx_env_import_capture",
     {
       title: "Import pasted fingerprint capture JSON",
@@ -180,7 +182,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("env_import_fingerprint", a),
   );
 
-  server.registerTool(
+  if (enabled.has("frx_page_automation_scan")) server.registerTool(
     "frx_page_automation_scan",
     {
       title: "Scan browser automation exposure in the current page",
@@ -193,7 +195,7 @@ export function registerTools(server: McpServer, director: Director): void {
     async (a) => callEnvTool("page_automation_scan", a),
   );
 
-  server.registerTool(
+  if (enabled.has("agent_start")) server.registerTool(
     "agent_start",
     {
       title: "Start a worker session",
@@ -221,7 +223,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_wait_for_stop")) server.registerTool(
     "agent_wait_for_stop",
     {
       title: "Wait for the worker's stage gate",
@@ -244,7 +246,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_poll")) server.registerTool(
     "agent_poll",
     {
       title: "Short-poll a worker turn for CLI clients",
@@ -269,7 +271,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_read")) server.registerTool(
     "agent_read",
     {
       title: "Read the worker's stage conclusion",
@@ -292,7 +294,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_read_brief")) server.registerTool(
     "agent_read_brief",
     {
       title: "Read a compact worker conclusion",
@@ -314,7 +316,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_state")) server.registerTool(
     "agent_state",
     {
       title: "Cheap liveness snapshot",
@@ -332,7 +334,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_send")) server.registerTool(
     "agent_send",
     {
       title: "Send a direction correction (the director's core move)",
@@ -356,7 +358,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_set_mode")) server.registerTool(
     "agent_set_mode",
     {
       title: "Switch assist/auto",
@@ -374,7 +376,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_stop")) server.registerTool(
     "agent_stop",
     {
       title: "Abort the current grind",
@@ -391,7 +393,7 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_runlog")) server.registerTool(
     "agent_runlog",
     {
       title: "Engine run log (diagnostic)",
@@ -408,26 +410,31 @@ export function registerTools(server: McpServer, director: Director): void {
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_tools")) server.registerTool(
     "agent_tools",
     {
       title: "List the browser-side tools",
       description:
-        "列出浏览器侧实际可用的工具清单(名称/说明/是否需确认/参数名)。Firefox Reverse v0.24.0 提供 68 个工具，" +
+        "列出浏览器侧实际可用的工具清单(名称/说明/是否需确认/参数名)。支持 prefix/query 筛选和 compact 精简返回，工具数量以当前浏览器为准。" +
         "包含引擎级逆向工具(signer_trace/jsvmp_trace/closure_read/webapi_trace/whitebox_diff/wasm_probe 等)、环境管理以及 Firefox 扩展查询/管理(addons_query/addons_manage)。" +
-        "默认走成本拆分(把工具名写进 guidance、委派 worker 执行);0.2.0 起也可用 agent_call_tool 亲自直调。只读、无副作用,先看这个再决定委派还是直调。",
-      inputSchema: {},
+        (profile === "direct" ? "当前 direct 分组可用 agent_call_tool 直调。" : profile === "delegate" ? "当前 delegate 分组用本目录编写 worker guidance，无直调入口。" : "all 分组可委派 worker 或用 agent_call_tool 直调。") + "只读、无副作用。",
+      inputSchema: {
+        prefix: z.string().max(80).optional().describe("工具名前缀，如 page_ 或 net_"),
+        query: z.string().max(160).optional().describe("名称/说明中的关键词，不是正则"),
+        compact: z.boolean().optional().describe("只返回名称、参数名和确认标志；默认 false"),
+        limit: z.number().int().min(1).max(200).optional().describe("返回数量上限；默认全量"),
+      },
     },
-    async () => {
+    async (args) => {
       try {
-        return ok(await director.tools());
+        return ok(await director.tools(args));
       } catch (e) {
         return err(e);
       }
     },
   );
 
-  server.registerTool(
+  if (enabled.has("agent_call_tool")) server.registerTool(
     "agent_call_tool",
     {
       title: "Directly run ONE browser tool (bypass the worker)",
@@ -435,7 +442,7 @@ export function registerTools(server: McpServer, director: Director): void {
         "★你(director)亲自跑一个浏览器引擎工具,跳过 DeepSeek worker —— 强模型直驱引擎级工具,比委派 worker 磨更快更准。" +
         "代价:每个工具回合都花 director 的 token(打破默认成本拆分;按需用、不用就仍走 agent_start/agent_send 省钱流)。先 agent_tools 查 name 和参数。" +
         "返回工具信封(ok/data/error);浏览器侧 dispatch 永不抛、已校验未知工具与缺参。" +
-        "⚠ 任一会话(agent_start 起的)正在跑时会被拒绝:raw 直调与运行中的 agent 共享同一标签页/hook/trace 状态,并发会串味——先 agent_stop/agent_wait_for_stop 再直调。需浏览器 v0.20.0+。",
+        "⚠ 任一 worker 会话正在跑时会被拒绝；先在浏览器侧栏停止/等待，或在 all 工具分组下调用 agent_stop/agent_wait_for_stop，再直调。需浏览器 v0.20.0+。",
       inputSchema: {
         name: z.string().describe("工具名(来自 agent_tools),如 code_search / signer_trace / page_eval / addons_query / addons_manage"),
         args: z.record(z.unknown()).optional().describe("该工具的参数对象(按 agent_tools 给的 params 填);省略=空对象"),

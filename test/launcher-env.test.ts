@@ -21,6 +21,7 @@ describe("launcher environment resolution", () => {
   });
   it("uses LaunchServices for macOS app bundles", () => {
     const args = buildFirefoxArgs(2828, "/Users/me/Profile");
+    expect(args).toContain("-new-instance");
     const command = buildLaunchCommand({
       firefoxBin: "/Applications/Firefox Reverse.app/Contents/MacOS/firefox",
       args,
@@ -46,6 +47,7 @@ describe("launcher environment resolution", () => {
 
   it("keeps direct executable launch on non-macOS platforms", () => {
     const args = buildFirefoxArgs(2829, "C:\\frx\\profile");
+    expect(args).toContain("-new-instance");
     const command = buildLaunchCommand({
       firefoxBin: "C:\\Program Files\\Firefox Reverse\\firefox.exe",
       args,

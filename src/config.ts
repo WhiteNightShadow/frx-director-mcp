@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { parseToolProfile } from "./toolProfiles.js";
 
 // 包根目录（dist/config.js 的上两级）。用它定位 .env，而不是依赖启动进程的 cwd ——
 // MCP 客户端（Claude Desktop / Cursor / Claude Code）启动 node 时的 cwd 通常不是本仓库目录。
@@ -50,6 +51,7 @@ function defaultWorkspaceRoot(): string {
 const FRX_DATA_HOME = join(homedir(), ".frx-director-mcp");
 
 export const config = {
+  toolProfile: parseToolProfile(env.FRX_TOOL_PROFILE),
   marionetteHost: env.FRX_MARIONETTE_HOST || "127.0.0.1",
   marionettePort: num(env.FRX_MARIONETTE_PORT, 2828),
   portWaitSec: num(env.FRX_PORT_WAIT_SEC, 90),
