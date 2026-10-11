@@ -315,7 +315,7 @@ agent_call_tool({name:"addons_manage", args:{action:"open_options", id:"扩展 G
 
 ## 📝 版本更新记录
 
-### v0.4.0（候选，2026-10-11）
+### v0.4.0（2026-10-11）
 - **工具分组（Issue #3）**：`FRX_TOOL_PROFILE=all/direct/delegate`，默认 23 个入口不变，直驱 13、委派 12；只在启动时选择，避免运行时工具列表与客户端缓存不一致。
 - **按需目录**：`agent_tools` 支持 prefix/query/compact/limit，完整查询兼容旧行为；实际浏览器工具数动态读取，Firefox Reverse v0.26.0 增至 71。
 - **独立实例启动**：补充当前 Firefox 基线有效的 `-new-instance`，保留旧参数兼容，不绕过 profile 锁、不全量终止浏览器进程。
