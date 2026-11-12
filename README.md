@@ -397,6 +397,6 @@ npm test           # vitest（mock 桥接 + mock Marionette 服务，无需真�
 
 ## License
 
-本项目以 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0）发布。Copyright © 2026 WhiteNightShadow。
+本项目以 [Apache License 2.0](LICENSE) 发布。Copyright © 2026 WhiteNightShadow。
 
 本项目是 [firefox-reverse](https://github.com/WhiteNightShadow/firefox-reverse) 的配套工具，仅供安全研究、接口对接与授权测试，请在合法授权范围内使用。
